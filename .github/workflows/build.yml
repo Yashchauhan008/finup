@@ -2,6 +2,11 @@ name: Build FinUp
 
 on:
   workflow_dispatch:
+    inputs:
+      notes:
+        description: "What's new (shown inside the app)"
+        required: false
+        default: "Improvements and fixes"
 
 permissions:
   contents: write
@@ -9,6 +14,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -48,7 +55,7 @@ jobs:
       - name: Generate app source
         run: |
           bash finup.sh
-          for s in finup2.sh finup3.sh finup4.sh; do
+          for s in finup2.sh finup3.sh finup4.sh finup5.sh; do
             if [ -f "$s" ]; then bash "$s"; fi
           done
 
@@ -59,7 +66,7 @@ jobs:
           rm -rf test
           if [ -f branding/make_icons.sh ]; then bash branding/make_icons.sh; fi
           flutter pub get
-          flutter build apk --release
+          flutter build apk --release --build-number=${{ github.run_number }} --build-name=2.1.${{ github.run_number }}
 
       - name: Package APK and source zip
         run: |
@@ -68,11 +75,23 @@ jobs:
           zip -r ../FinUp-source.zip . -x 'build/*' '.dart_tool/*' '.idea/*' '*.iml' 'android/.gradle/*' 'android/local.properties'
           cd ..
 
-      - name: Publish release
+      - name: Publish private release (APK + source)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: FinUp build ${{ github.run_number }}
+          body: ${{ inputs.notes }}
           files: |
             FinUp.apk
             FinUp-source.zip
+
+      - name: Publish APK to public updates repo
+        if: env.RELEASES_TOKEN != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: Yashchauhan008/finup-releases
+          token: ${{ secrets.RELEASES_TOKEN }}
+          tag_name: build-${{ github.run_number }}
+          name: FinUp 2.1.${{ github.run_number }}
+          body: ${{ inputs.notes }}
+          files: FinUp.apk
