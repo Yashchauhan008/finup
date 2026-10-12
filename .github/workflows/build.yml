@@ -32,7 +32,7 @@ jobs:
       - name: Icon tools
         run: sudo apt-get update -qq && sudo apt-get install -y -qq librsvg2-bin zip
 
-      - name: Fixed signing key (updates keep your data)
+      - name: Fixed signing key (same key for every build)
         run: |
           if [ ! -f keys/debug.keystore ]; then
             mkdir -p keys
@@ -47,26 +47,73 @@ jobs:
           fi
           mkdir -p ~/.android
           cp keys/debug.keystore ~/.android/debug.keystore
-          if [ -n "${ANDROID_USER_HOME:-}" ]; then
-            mkdir -p "$ANDROID_USER_HOME"
-            cp keys/debug.keystore "$ANDROID_USER_HOME/debug.keystore"
-          fi
 
       - name: Generate app source
         run: |
           bash finup.sh
-          for s in finup2.sh finup3.sh finup4.sh finup5.sh; do
-            if [ -f "$s" ]; then bash "$s"; fi
+          for n in 2 3 4 5 6 7 8 9 10; do
+            if [ -f "finup$n.sh" ]; then bash "finup$n.sh"; fi
           done
 
-      - name: Create Android project, icons, build APK
+      - name: Create Android project, icons, signing, build APK
         working-directory: app
+        env:
+          FINUP_KEYSTORE: ${{ github.workspace }}/keys/debug.keystore
         run: |
           flutter create --project-name finup --org com.yash --platforms android .
           rm -rf test
           if [ -f branding/make_icons.sh ]; then bash branding/make_icons.sh; fi
+          python3 - <<'PY'
+          import os, pathlib
+          ks = os.environ["FINUP_KEYSTORE"]
+          kts = pathlib.Path("android/app/build.gradle.kts")
+          groovy = pathlib.Path("android/app/build.gradle")
+          if kts.exists():
+              s = kts.read_text()
+              block = ('    signingConfigs {\n'
+                       '        create("finup") {\n'
+                       f'            storeFile = file("{ks}")\n'
+                       '            storePassword = "android"\n'
+                       '            keyAlias = "androiddebugkey"\n'
+                       '            keyPassword = "android"\n'
+                       '        }\n'
+                       '    }\n\n')
+              if 'create("finup")' not in s:
+                  s = s.replace("    buildTypes {", block + "    buildTypes {", 1)
+              s = s.replace('signingConfigs.getByName("debug")', 'signingConfigs.getByName("finup")')
+              kts.write_text(s)
+              ok = 'getByName("finup")' in s and 'create("finup")' in s
+          elif groovy.exists():
+              s = groovy.read_text()
+              block = ("    signingConfigs {\n"
+                       "        finup {\n"
+                       f"            storeFile file('{ks}')\n"
+                       "            storePassword 'android'\n"
+                       "            keyAlias 'androiddebugkey'\n"
+                       "            keyPassword 'android'\n"
+                       "        }\n"
+                       "    }\n\n")
+              if "        finup {" not in s:
+                  s = s.replace("    buildTypes {", block + "    buildTypes {", 1)
+              s = s.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.finup")
+              groovy.write_text(s)
+              ok = "signingConfigs.finup" in s
+          else:
+              raise SystemExit("No android/app/build.gradle(.kts) found")
+          if not ok:
+              raise SystemExit("Could not apply FinUp signing config")
+          print("FinUp signing config applied with", ks)
+          PY
           flutter pub get
           flutter build apk --release --build-number=${{ github.run_number }} --build-name=2.1.${{ github.run_number }}
+
+      - name: Show signing fingerprint (must be the same every build)
+        run: |
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$APKSIGNER" ]; then
+            "$APKSIGNER" verify --print-certs app/build/app/outputs/flutter-apk/app-release.apk | grep -i "SHA-256" || true
+          fi
+          keytool -list -v -keystore keys/debug.keystore -storepass android | grep -i "SHA256" || true
 
       - name: Package APK and source zip
         run: |
