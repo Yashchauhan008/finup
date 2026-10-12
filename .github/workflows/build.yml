@@ -22,6 +22,9 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Icon tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq librsvg2-bin zip
+
       - name: Fixed signing key (updates keep your data)
         run: |
           if [ ! -f keys/debug.keystore ]; then
@@ -43,13 +46,18 @@ jobs:
           fi
 
       - name: Generate app source
-        run: bash finup.sh
+        run: |
+          bash finup.sh
+          for s in finup2.sh finup3.sh finup4.sh; do
+            if [ -f "$s" ]; then bash "$s"; fi
+          done
 
-      - name: Create Android project and build APK
+      - name: Create Android project, icons, build APK
         working-directory: app
         run: |
           flutter create --project-name finup --org com.yash --platforms android .
           rm -rf test
+          if [ -f branding/make_icons.sh ]; then bash branding/make_icons.sh; fi
           flutter pub get
           flutter build apk --release
 
