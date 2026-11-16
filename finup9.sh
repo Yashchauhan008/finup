@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FinUp Part 9 — widget visual refresh (ink glass + role accents)
+# FinUp Part 9 — widget visual refresh (flat ink cards, no accent bars / gradients)
 set -euo pipefail
 cd app
 mkdir -p \
@@ -11,11 +11,7 @@ mkdir -p \
 cat > android/app/src/main/res/drawable/finup_widget_bg.xml <<'__END__'
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient
-        android:startColor="#1B1E2A"
-        android:centerColor="#171925"
-        android:endColor="#14161F"
-        android:angle="160"/>
+    <solid android:color="#171925"/>
     <corners android:radius="26dp"/>
     <stroke android:width="1dp" android:color="#26FFFFFF"/>
 </shape>
@@ -82,7 +78,7 @@ __END__
 cat > android/app/src/main/res/drawable/finup_avatar.xml <<'__END__'
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient android:startColor="#E7A0C4" android:endColor="#8B86E8" android:angle="135"/>
+    <solid android:color="#8B86E8"/>
     <corners android:radius="10dp"/>
 </shape>
 __END__
@@ -90,7 +86,7 @@ __END__
 cat > android/app/src/main/res/drawable/finup_brand_mark.xml <<'__END__'
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient android:startColor="#E7A0C4" android:centerColor="#8B86E8" android:endColor="#6DCFB4" android:angle="210"/>
+    <solid android:color="#8B86E8"/>
     <corners android:radius="10dp"/>
 </shape>
 __END__
@@ -103,47 +99,7 @@ cat > android/app/src/main/res/drawable/finup_review_panel.xml <<'__END__'
 </shape>
 __END__
 
-cat > android/app/src/main/res/drawable/finup_accent_gold.xml <<'__END__'
-<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#E6B35A"/>
-    <corners android:radius="99dp"/>
-</shape>
-__END__
-
-cat > android/app/src/main/res/drawable/finup_accent_mint.xml <<'__END__'
-<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#6DCFB4"/>
-    <corners android:radius="99dp"/>
-</shape>
-__END__
-
-cat > android/app/src/main/res/drawable/finup_accent_pink.xml <<'__END__'
-<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#E7A0C4"/>
-    <corners android:radius="99dp"/>
-</shape>
-__END__
-
-cat > android/app/src/main/res/drawable/finup_accent_coral.xml <<'__END__'
-<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#F0816C"/>
-    <corners android:radius="99dp"/>
-</shape>
-__END__
-
-cat > android/app/src/main/res/drawable/finup_accent_lav.xml <<'__END__'
-<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#8B86E8"/>
-    <corners android:radius="99dp"/>
-</shape>
-__END__
-
-cat > android/app/src/main/res/drawable/finup_prog_gold.xml <<'__END__'
+cat > android/app/src/main/res/drawable/finup_prog.xml <<'__END__'
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:id="@android:id/background">
@@ -156,52 +112,16 @@ cat > android/app/src/main/res/drawable/finup_prog_gold.xml <<'__END__'
         <clip>
             <shape android:shape="rectangle">
                 <corners android:radius="99dp"/>
-                <solid android:color="#E6B35A"/>
+                <solid android:color="#8B86E8"/>
             </shape>
         </clip>
     </item>
 </layer-list>
 __END__
-
-cat > android/app/src/main/res/drawable/finup_prog_mint.xml <<'__END__'
-<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@android:id/background">
-        <shape android:shape="rectangle">
-            <corners android:radius="99dp"/>
-            <solid android:color="#1AFFFFFF"/>
-        </shape>
-    </item>
-    <item android:id="@android:id/progress">
-        <clip>
-            <shape android:shape="rectangle">
-                <corners android:radius="99dp"/>
-                <gradient android:startColor="#8B86E8" android:endColor="#E7A0C4" android:angle="0"/>
-            </shape>
-        </clip>
-    </item>
-</layer-list>
-__END__
-
-cat > android/app/src/main/res/drawable/finup_prog_coral.xml <<'__END__'
-<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@android:id/background">
-        <shape android:shape="rectangle">
-            <corners android:radius="99dp"/>
-            <solid android:color="#1AFFFFFF"/>
-        </shape>
-    </item>
-    <item android:id="@android:id/progress">
-        <clip>
-            <shape android:shape="rectangle">
-                <corners android:radius="99dp"/>
-                <solid android:color="#F0816C"/>
-            </shape>
-        </clip>
-    </item>
-</layer-list>
-__END__
+# Aliases for any leftover progress drawable names (all solid lavender).
+cp android/app/src/main/res/drawable/finup_prog.xml android/app/src/main/res/drawable/finup_prog_gold.xml
+cp android/app/src/main/res/drawable/finup_prog.xml android/app/src/main/res/drawable/finup_prog_mint.xml
+cp android/app/src/main/res/drawable/finup_prog.xml android/app/src/main/res/drawable/finup_prog_coral.xml
 
 ############################ Hero: Spent today ############################
 cat > android/app/src/main/res/layout/finup_widget.xml <<'__END__'
@@ -210,125 +130,108 @@ cat > android/app/src/main/res/layout/finup_widget.xml <<'__END__'
     android:id="@+id/w_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
+    android:orientation="vertical"
+    android:padding="14dp"
     android:background="@drawable/finup_widget_bg">
 
-    <ImageView
-        android:layout_width="4dp"
-        android:layout_height="match_parent"
-        android:layout_marginTop="14dp"
-        android:layout_marginBottom="14dp"
-        android:layout_marginStart="8dp"
-        android:src="@drawable/finup_accent_lav"
-        android:contentDescription="@null"/>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:src="@mipmap/ic_launcher"
+            android:contentDescription="FinUp"/>
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="Spent today"
+            android:textColor="#B3FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold"/>
+        <TextView
+            android:id="@+id/w_review"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/finup_chip_ok"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="All reviewed"
+            android:textColor="#9AEBCF"
+            android:textSize="11sp"
+            android:textStyle="bold"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/w_spent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="₹0"
+        android:textColor="#FFFFFF"
+        android:textSize="32sp"
+        android:textStyle="bold"/>
+
+    <TextView
+        android:id="@+id/w_balance"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Total balance · ₹0"
+        android:textColor="#94FFFFFF"
+        android:textSize="12sp"/>
 
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:padding="14dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:src="@drawable/finup_brand_mark"
-                android:contentDescription="FinUp"/>
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:text="SPENT TODAY"
-                android:textColor="#9EFFFFFF"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.04"/>
-            <TextView
-                android:id="@+id/w_review"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/finup_chip_ok"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp"
-                android:text="All reviewed"
-                android:textColor="#9AEBCF"
-                android:textSize="11sp"
-                android:textStyle="bold"/>
-        </LinearLayout>
-
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
         <TextView
-            android:id="@+id/w_spent"
-            android:layout_width="wrap_content"
+            android:id="@+id/w_add"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="₹0"
-            android:textColor="#FFFFFF"
-            android:textSize="32sp"
+            android:layout_weight="1.2"
+            android:background="@drawable/finup_widget_btn_primary"
+            android:gravity="center"
+            android:paddingTop="11dp"
+            android:paddingBottom="11dp"
+            android:text="+ Expense"
+            android:textColor="#17141F"
+            android:textSize="12sp"
             android:textStyle="bold"/>
-
         <TextView
-            android:id="@+id/w_balance"
-            android:layout_width="wrap_content"
+            android:id="@+id/w_voice"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Total balance · ₹0"
-            android:textColor="#94FFFFFF"
-            android:textSize="12sp"/>
-
-        <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_weight="1"
+            android:layout_marginStart="7dp"
+            android:background="@drawable/finup_widget_btn_ghost"
+            android:gravity="center"
+            android:paddingTop="11dp"
+            android:paddingBottom="11dp"
+            android:text="Voice"
+            android:textColor="#F5F2FF"
+            android:textSize="12sp"
+            android:textStyle="bold"/>
+        <TextView
+            android:id="@+id/w_scan"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
-            <TextView
-                android:id="@+id/w_add"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1.2"
-                android:background="@drawable/finup_widget_btn_primary"
-                android:gravity="center"
-                android:paddingTop="11dp"
-                android:paddingBottom="11dp"
-                android:text="+ Expense"
-                android:textColor="#17141F"
-                android:textSize="12sp"
-                android:textStyle="bold"/>
-            <TextView
-                android:id="@+id/w_voice"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="7dp"
-                android:background="@drawable/finup_widget_btn_ghost"
-                android:gravity="center"
-                android:paddingTop="11dp"
-                android:paddingBottom="11dp"
-                android:text="Voice"
-                android:textColor="#F5F2FF"
-                android:textSize="12sp"
-                android:textStyle="bold"/>
-            <TextView
-                android:id="@+id/w_scan"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="7dp"
-                android:background="@drawable/finup_widget_btn_ghost"
-                android:gravity="center"
-                android:paddingTop="11dp"
-                android:paddingBottom="11dp"
-                android:text="Scan"
-                android:textColor="#F5F2FF"
-                android:textSize="12sp"
-                android:textStyle="bold"/>
-        </LinearLayout>
+            android:layout_weight="1"
+            android:layout_marginStart="7dp"
+            android:background="@drawable/finup_widget_btn_ghost"
+            android:gravity="center"
+            android:paddingTop="11dp"
+            android:paddingBottom="11dp"
+            android:text="Scan"
+            android:textColor="#F5F2FF"
+            android:textSize="12sp"
+            android:textStyle="bold"/>
     </LinearLayout>
 </LinearLayout>
 __END__
@@ -340,24 +243,9 @@ cat > android/app/src/main/res/layout/finup_w_budget.xml <<'__END__'
     android:id="@+id/w_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
+    android:orientation="vertical"
+    android:padding="14dp"
     android:background="@drawable/finup_widget_bg">
-
-    <ImageView
-        android:layout_width="4dp"
-        android:layout_height="match_parent"
-        android:layout_margin="12dp"
-        android:src="@drawable/finup_accent_gold"
-        android:contentDescription="@null"/>
-
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp"
-        android:paddingEnd="12dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -368,7 +256,7 @@ cat > android/app/src/main/res/layout/finup_w_budget.xml <<'__END__'
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="BUDGETS"
+                android:text="Budgets"
                 android:textColor="#9EFFFFFF"
                 android:textSize="11sp"
                 android:textStyle="bold"
@@ -384,7 +272,7 @@ cat > android/app/src/main/res/layout/finup_w_budget.xml <<'__END__'
                 android:paddingBottom="3dp"
                 android:text="Empty"
                 android:textColor="#C9C5FF"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:textStyle="bold"/>
         </LinearLayout>
 
@@ -423,7 +311,7 @@ cat > android/app/src/main/res/layout/finup_w_budget.xml <<'__END__'
                     android:id="@+id/w_amt1"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="#E6B35A"
+                    android:textColor="#B3FFFFFF"
                     android:textSize="11sp"
                     android:textStyle="bold"/>
             </LinearLayout>
@@ -435,7 +323,7 @@ cat > android/app/src/main/res/layout/finup_w_budget.xml <<'__END__'
                 android:layout_marginTop="5dp"
                 android:max="100"
                 android:progress="0"
-                android:progressDrawable="@drawable/finup_prog_gold"/>
+                android:progressDrawable="@drawable/finup_prog"/>
         </LinearLayout>
 
         <LinearLayout
@@ -463,7 +351,7 @@ cat > android/app/src/main/res/layout/finup_w_budget.xml <<'__END__'
                     android:id="@+id/w_amt2"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="#E6B35A"
+                    android:textColor="#B3FFFFFF"
                     android:textSize="11sp"
                     android:textStyle="bold"/>
             </LinearLayout>
@@ -475,7 +363,7 @@ cat > android/app/src/main/res/layout/finup_w_budget.xml <<'__END__'
                 android:layout_marginTop="5dp"
                 android:max="100"
                 android:progress="0"
-                android:progressDrawable="@drawable/finup_prog_gold"/>
+                android:progressDrawable="@drawable/finup_prog"/>
         </LinearLayout>
 
         <LinearLayout
@@ -503,7 +391,7 @@ cat > android/app/src/main/res/layout/finup_w_budget.xml <<'__END__'
                     android:id="@+id/w_amt3"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="#E6B35A"
+                    android:textColor="#B3FFFFFF"
                     android:textSize="11sp"
                     android:textStyle="bold"/>
             </LinearLayout>
@@ -515,10 +403,10 @@ cat > android/app/src/main/res/layout/finup_w_budget.xml <<'__END__'
                 android:layout_marginTop="5dp"
                 android:max="100"
                 android:progress="0"
-                android:progressDrawable="@drawable/finup_prog_gold"/>
+                android:progressDrawable="@drawable/finup_prog"/>
         </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+
 __END__
 
 ############################ Accounts ############################
@@ -528,24 +416,9 @@ cat > android/app/src/main/res/layout/finup_w_accounts.xml <<'__END__'
     android:id="@+id/w_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
+    android:orientation="vertical"
+    android:padding="14dp"
     android:background="@drawable/finup_widget_bg">
-
-    <ImageView
-        android:layout_width="4dp"
-        android:layout_height="match_parent"
-        android:layout_margin="12dp"
-        android:src="@drawable/finup_accent_mint"
-        android:contentDescription="@null"/>
-
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp"
-        android:paddingEnd="12dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -556,7 +429,7 @@ cat > android/app/src/main/res/layout/finup_w_accounts.xml <<'__END__'
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="ACCOUNTS"
+                android:text="Accounts"
                 android:textColor="#9EFFFFFF"
                 android:textSize="11sp"
                 android:textStyle="bold"
@@ -585,31 +458,31 @@ cat > android/app/src/main/res/layout/finup_w_accounts.xml <<'__END__'
                 <TextView android:id="@+id/w_name1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
                 <TextView android:id="@+id/w_amt1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
             </LinearLayout>
-            <ProgressBar android:id="@+id/w_track1" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="5dp" android:layout_marginTop="5dp" android:max="100" android:progress="0" android:progressDrawable="@drawable/finup_prog_mint"/>
+            <ProgressBar android:id="@+id/w_track1" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="5dp" android:layout_marginTop="5dp" android:max="100" android:progress="0" android:progressDrawable="@drawable/finup_prog"/>
         </LinearLayout>
         <LinearLayout android:id="@+id/w_row2" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical" android:visibility="gone">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
                 <TextView android:id="@+id/w_name2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
                 <TextView android:id="@+id/w_amt2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
             </LinearLayout>
-            <ProgressBar android:id="@+id/w_track2" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="5dp" android:layout_marginTop="5dp" android:max="100" android:progress="0" android:progressDrawable="@drawable/finup_prog_mint"/>
+            <ProgressBar android:id="@+id/w_track2" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="5dp" android:layout_marginTop="5dp" android:max="100" android:progress="0" android:progressDrawable="@drawable/finup_prog"/>
         </LinearLayout>
         <LinearLayout android:id="@+id/w_row3" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical" android:visibility="gone">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
                 <TextView android:id="@+id/w_name3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
                 <TextView android:id="@+id/w_amt3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
             </LinearLayout>
-            <ProgressBar android:id="@+id/w_track3" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="5dp" android:layout_marginTop="5dp" android:max="100" android:progress="0" android:progressDrawable="@drawable/finup_prog_mint"/>
+            <ProgressBar android:id="@+id/w_track3" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="5dp" android:layout_marginTop="5dp" android:max="100" android:progress="0" android:progressDrawable="@drawable/finup_prog"/>
         </LinearLayout>
         <LinearLayout android:id="@+id/w_row4" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical" android:visibility="gone">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
                 <TextView android:id="@+id/w_name4" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
                 <TextView android:id="@+id/w_amt4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
             </LinearLayout>
-            <ProgressBar android:id="@+id/w_track4" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="5dp" android:layout_marginTop="5dp" android:max="100" android:progress="0" android:progressDrawable="@drawable/finup_prog_mint"/>
+            <ProgressBar android:id="@+id/w_track4" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="5dp" android:layout_marginTop="5dp" android:max="100" android:progress="0" android:progressDrawable="@drawable/finup_prog"/>
         </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+
 __END__
 
 ############################ People ############################
@@ -619,24 +492,9 @@ cat > android/app/src/main/res/layout/finup_w_people.xml <<'__END__'
     android:id="@+id/w_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
+    android:orientation="vertical"
+    android:padding="14dp"
     android:background="@drawable/finup_widget_bg">
-
-    <ImageView
-        android:layout_width="4dp"
-        android:layout_height="match_parent"
-        android:layout_margin="12dp"
-        android:src="@drawable/finup_accent_pink"
-        android:contentDescription="@null"/>
-
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp"
-        android:paddingEnd="12dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -647,7 +505,7 @@ cat > android/app/src/main/res/layout/finup_w_people.xml <<'__END__'
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="PEOPLE"
+                android:text="People"
                 android:textColor="#9EFFFFFF"
                 android:textSize="11sp"
                 android:textStyle="bold"
@@ -663,7 +521,7 @@ cat > android/app/src/main/res/layout/finup_w_people.xml <<'__END__'
                 android:paddingBottom="3dp"
                 android:text="0 open"
                 android:textColor="#EFEAFC"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:textStyle="bold"/>
         </LinearLayout>
 
@@ -710,7 +568,7 @@ cat > android/app/src/main/res/layout/finup_w_people.xml <<'__END__'
             <TextView android:id="@+id/w_amt4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#9AEBCF" android:textSize="13sp" android:textStyle="bold"/>
         </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+
 __END__
 
 ############################ Week ############################
@@ -720,29 +578,14 @@ cat > android/app/src/main/res/layout/finup_w_week.xml <<'__END__'
     android:id="@+id/w_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
+    android:orientation="vertical"
+    android:padding="14dp"
     android:background="@drawable/finup_widget_bg">
-
-    <ImageView
-        android:layout_width="4dp"
-        android:layout_height="match_parent"
-        android:layout_margin="12dp"
-        android:src="@drawable/finup_accent_coral"
-        android:contentDescription="@null"/>
-
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp"
-        android:paddingEnd="12dp">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="THIS WEEK"
+            android:text="This week"
             android:textColor="#9EFFFFFF"
             android:textSize="11sp"
             android:textStyle="bold"
@@ -766,7 +609,7 @@ cat > android/app/src/main/res/layout/finup_w_week.xml <<'__END__'
             android:layout_marginTop="8dp"
             android:max="100"
             android:progress="0"
-            android:progressDrawable="@drawable/finup_prog_coral"/>
+            android:progressDrawable="@drawable/finup_prog"/>
 
         <TextView
             android:id="@+id/w_last"
@@ -792,7 +635,7 @@ cat > android/app/src/main/res/layout/finup_w_week.xml <<'__END__'
             android:textSize="11sp"
             android:textStyle="bold"/>
     </LinearLayout>
-</LinearLayout>
+
 __END__
 
 ############################ Review ############################
@@ -802,24 +645,9 @@ cat > android/app/src/main/res/layout/finup_w_review.xml <<'__END__'
     android:id="@+id/w_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
+    android:orientation="vertical"
+    android:padding="14dp"
     android:background="@drawable/finup_widget_bg">
-
-    <ImageView
-        android:layout_width="4dp"
-        android:layout_height="match_parent"
-        android:layout_margin="12dp"
-        android:src="@drawable/finup_accent_mint"
-        android:contentDescription="@null"/>
-
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp"
-        android:paddingEnd="12dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -830,7 +658,7 @@ cat > android/app/src/main/res/layout/finup_w_review.xml <<'__END__'
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="REVIEW"
+                android:text="Review"
                 android:textColor="#9EFFFFFF"
                 android:textSize="11sp"
                 android:textStyle="bold"
@@ -846,7 +674,7 @@ cat > android/app/src/main/res/layout/finup_w_review.xml <<'__END__'
                 android:paddingBottom="3dp"
                 android:text="Clear"
                 android:textColor="#9AEBCF"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:textStyle="bold"/>
         </LinearLayout>
 
@@ -877,7 +705,7 @@ cat > android/app/src/main/res/layout/finup_w_review.xml <<'__END__'
                 android:textSize="12sp"/>
         </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+
 __END__
 
 ############################ Kotlin binders ############################
@@ -1130,7 +958,7 @@ __END__
 ############################ Checks ############################
 for file in \
   android/app/src/main/res/drawable/finup_widget_btn_primary.xml \
-  android/app/src/main/res/drawable/finup_prog_gold.xml \
+  android/app/src/main/res/drawable/finup_prog.xml \
   android/app/src/main/res/drawable/finup_brand_mark.xml \
   android/app/src/main/res/layout/finup_widget.xml \
   android/app/src/main/res/layout/finup_w_budget.xml \
