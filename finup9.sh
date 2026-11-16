@@ -1128,19 +1128,38 @@ class ReviewInboxWidget : AppWidgetProvider() {
 __END__
 
 ############################ Checks ############################
+for file in \
+  android/app/src/main/res/drawable/finup_widget_btn_primary.xml \
+  android/app/src/main/res/drawable/finup_prog_gold.xml \
+  android/app/src/main/res/drawable/finup_brand_mark.xml \
+  android/app/src/main/res/layout/finup_widget.xml \
+  android/app/src/main/res/layout/finup_w_budget.xml \
+  android/app/src/main/res/layout/finup_w_accounts.xml \
+  android/app/src/main/res/layout/finup_w_people.xml \
+  android/app/src/main/res/layout/finup_w_week.xml \
+  android/app/src/main/res/layout/finup_w_review.xml \
+  android/app/src/main/kotlin/com/yash/finup/AccountsWidget.kt \
+  android/app/src/main/kotlin/com/yash/finup/PeopleBalanceWidget.kt \
+  android/app/src/main/kotlin/com/yash/finup/WeekCompareWidget.kt \
+  android/app/src/main/kotlin/com/yash/finup/ReviewInboxWidget.kt
+do
+  if [ ! -f "$file" ]; then
+    echo "ERROR: finup9 missing $file"
+    exit 1
+  fi
+done
 for check in \
-  "finup_widget_btn_primary|android/app/src/main/res/drawable/finup_widget_btn_primary.xml" \
-  "finup_prog_gold|android/app/src/main/res/drawable/finup_prog_gold.xml" \
   "w_chip|android/app/src/main/res/layout/finup_w_budget.xml" \
   "w_track1|android/app/src/main/res/layout/finup_w_accounts.xml" \
   "w_av1|android/app/src/main/res/layout/finup_w_people.xml" \
   "w_compare|android/app/src/main/res/layout/finup_w_week.xml" \
   "Inbox zero|android/app/src/main/kotlin/com/yash/finup/ReviewInboxWidget.kt" \
   "w_track1|android/app/src/main/kotlin/com/yash/finup/AccountsWidget.kt" \
-  "w_av1|android/app/src/main/kotlin/com/yash/finup/PeopleBalanceWidget.kt"
+  "w_av1|android/app/src/main/kotlin/com/yash/finup/PeopleBalanceWidget.kt" \
+  "finup_widget_btn_primary|android/app/src/main/res/layout/finup_widget.xml"
 do
   pat="${check%%|*}"; file="${check#*|}"
-  if [ ! -f "$file" ] || ! grep -qF "$pat" "$file"; then
+  if ! grep -qF "$pat" "$file"; then
     echo "ERROR: finup9 failed in $file ($pat)"
     exit 1
   fi
