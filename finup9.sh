@@ -881,18 +881,37 @@ cat > android/app/src/main/res/layout/finup_w_review.xml <<'__END__'
 __END__
 
 ############################ Kotlin binders ############################
-# Hero chip text
+# Hero chip / balance label (literal replacements only — avoid perl ${})
 if [ -f android/app/src/main/kotlin/com/yash/finup/FinUpWidget.kt ]; then
-  perl -pi -e 's#if \(review == 0\) "All reviewed ✓" else "\$review to review"#if (review == 0) "All reviewed" else "$review to review"#' \
+  sed -i 's/All reviewed ✓/All reviewed/g' \
     android/app/src/main/kotlin/com/yash/finup/FinUpWidget.kt
-  perl -pi -e 's#"Total balance \$\{fmt\.format\(balance\)\}"#"Total balance · ${fmt.format(balance)}"#' \
+  sed -i 's/Total balance \${fmt.format(balance)}/Total balance · ${fmt.format(balance)}/g' \
     android/app/src/main/kotlin/com/yash/finup/FinUpWidget.kt
 fi
 
 # Budget chip
 if [ -f android/app/src/main/kotlin/com/yash/finup/BudgetPulseWidget.kt ]; then
-  perl -0777 -pi -e 's#if \(rows\.isEmpty\(\)\) \{\s*FinUpWidgets\.setVisible\(v, R\.id\.w_empty\);\s*\} else \{\s*FinUpWidgets\.setGone\(v, R\.id\.w_empty\);#if (rows.isEmpty()) {\n                FinUpWidgets.setVisible(v, R.id.w_empty)\n                v.setTextViewText(R.id.w_chip, "Empty")\n            } else {\n                FinUpWidgets.setGone(v, R.id.w_empty)\n                v.setTextViewText(R.id.w_chip, "${rows.size} live")#s' \
-    android/app/src/main/kotlin/com/yash/finup/BudgetPulseWidget.kt
+  python3 - <<'PY'
+from pathlib import Path
+p = Path("android/app/src/main/kotlin/com/yash/finup/BudgetPulseWidget.kt")
+s = p.read_text()
+old = """            if (rows.isEmpty()) {
+                FinUpWidgets.setVisible(v, R.id.w_empty)
+            } else {
+                FinUpWidgets.setGone(v, R.id.w_empty)
+"""
+new = """            if (rows.isEmpty()) {
+                FinUpWidgets.setVisible(v, R.id.w_empty)
+                v.setTextViewText(R.id.w_chip, "Empty")
+            } else {
+                FinUpWidgets.setGone(v, R.id.w_empty)
+                v.setTextViewText(R.id.w_chip, "${rows.size} live")
+"""
+if old not in s:
+    raise SystemExit("BudgetPulseWidget empty-branch patch failed")
+p.write_text(s.replace(old, new, 1))
+print("BudgetPulseWidget chip patched")
+PY
 fi
 
 # Accounts share tracks
