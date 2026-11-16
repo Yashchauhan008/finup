@@ -116,6 +116,35 @@ jobs:
           if not ok:
               raise SystemExit("Could not apply FinUp signing config")
           print("FinUp release signing config applied with", ks, "alias", alias)
+
+          # Avoid Flutter plugin lintVital crashes (e.g. image_picker_android NoSuchMethodError)
+          props = pathlib.Path("android/gradle.properties")
+          props_text = props.read_text() if props.exists() else ""
+          if "android.lint.checkReleaseBuilds=false" not in props_text:
+              props.write_text(props_text.rstrip() + "\nandroid.lint.checkReleaseBuilds=false\n")
+          for gradle in (kts, groovy):
+              if not gradle.exists():
+                  continue
+              g = gradle.read_text()
+              if "checkReleaseBuilds" in g:
+                  continue
+              lint_block_kts = (
+                  "    lint {\n"
+                  "        checkReleaseBuilds = false\n"
+                  "        abortOnError = false\n"
+                  "    }\n"
+              )
+              lint_block_groovy = (
+                  "    lint {\n"
+                  "        checkReleaseBuilds false\n"
+                  "        abortOnError false\n"
+                  "    }\n"
+              )
+              needle = "    buildTypes {"
+              if needle in g:
+                  block = lint_block_kts if gradle == kts else lint_block_groovy
+                  gradle.write_text(g.replace(needle, block + needle, 1))
+          print("Disabled lintVital for release builds")
           PY
           flutter pub get
           flutter build apk --release --build-number=${{ github.run_number }} --build-name=2.1.${{ github.run_number }}
