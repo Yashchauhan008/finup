@@ -5,7 +5,16 @@ mkdir -p lib/data lib/widgets lib/screens
 
 ############################ lib/data/stats.dart ############################
 cat > lib/data/stats.dart <<'__END__'
+import 'package:flutter/material.dart';
+
+import '../theme.dart';
 import 'db.dart';
+
+/// Synthetic category ids for people-ledger money in charts.
+const int kUsageLentId = -101; // you gave / lent (not a settle note)
+const int kUsageSettledOutId = -102; // you paid someone back / settled
+const int kUsageBorrowedId = -103; // you got / borrowed
+const int kUsageSettledInId = -104; // someone paid you back / settled
 
 class MonthStat {
   final DateTime month;
@@ -39,15 +48,114 @@ class Goal {
 (DateTime, DateTime) monthRange(DateTime m) =>
     (DateTime(m.year, m.month, 1), DateTime(m.year, m.month + 1, 1));
 
+bool isSettledNote(String? note) {
+  final n = (note ?? '').toLowerCase();
+  return n.contains('settled');
+}
+
+String usageBucketName(int? id) {
+  switch (id) {
+    case kUsageLentId:
+      return 'Lent to people';
+    case kUsageSettledOutId:
+      return 'Loan / settle paid';
+    case kUsageBorrowedId:
+      return 'Borrowed / received';
+    case kUsageSettledInId:
+      return 'Settlements received';
+    default:
+      return 'Needs review';
+  }
+}
+
+IconData usageBucketIcon(int? id) {
+  switch (id) {
+    case kUsageLentId:
+      return Icons.volunteer_activism_rounded;
+    case kUsageSettledOutId:
+      return Icons.handshake_rounded;
+    case kUsageBorrowedId:
+      return Icons.south_west_rounded;
+    case kUsageSettledInId:
+      return Icons.handshake_rounded;
+    default:
+      return Icons.help_outline_rounded;
+  }
+}
+
+Color usageBucketColor(int? id) {
+  switch (id) {
+    case kUsageLentId:
+      return AppColors.pink;
+    case kUsageSettledOutId:
+      return const Color(0xFFE8A87C);
+    case kUsageBorrowedId:
+      return AppColors.income;
+    case kUsageSettledInId:
+      return AppColors.lavender;
+    default:
+      return AppColors.lavender;
+  }
+}
+
+bool isUsageBucket(int? id) =>
+    id == kUsageLentId ||
+    id == kUsageSettledOutId ||
+    id == kUsageBorrowedId ||
+    id == kUsageSettledInId;
+
 extension Stats on AppDatabase {
-  Future<List<Map<String, Object?>>> _rows(DateTime from, DateTime to) {
-    return db.query('transactions',
-        columns: ['type', 'amount', 'category_id', 'counterparty', 'occurred_at'],
-        where: 'occurred_at >= ? AND occurred_at < ?',
-        whereArgs: [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch]);
+  Future<List<Map<String, Object?>>> _rows(DateTime from, DateTime to,
+      {bool excludePeople = false}) {
+    return db.query(
+      'transactions',
+      columns: [
+        'type',
+        'amount',
+        'category_id',
+        'counterparty',
+        'occurred_at',
+        'person_id',
+        'note',
+      ],
+      where: excludePeople
+          ? 'occurred_at >= ? AND occurred_at < ? AND person_id IS NULL'
+          : 'occurred_at >= ? AND occurred_at < ?',
+      whereArgs: [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
+    );
   }
 
+  int? _usageBucket(Map<String, Object?> r, String type) {
+    if (r['type'] != type) return null;
+    final personId = r['person_id'] as int?;
+    if (personId == null) return r['category_id'] as int?;
+    final settled = isSettledNote(r['note'] as String?);
+    if (type == 'expense') {
+      return settled ? kUsageSettledOutId : kUsageLentId;
+    }
+    if (type == 'income') {
+      return settled ? kUsageSettledInId : kUsageBorrowedId;
+    }
+    return null;
+  }
+
+  /// True spending / income only (excludes people ledger). Used for budgets & "saved".
   Future<(double, double)> incomeExpense(DateTime from, DateTime to) async {
+    double inc = 0;
+    double exp = 0;
+    for (final r in await _rows(from, to, excludePeople: true)) {
+      final a = (r['amount'] as num).toDouble();
+      if (r['type'] == 'income') {
+        inc += a;
+      } else if (r['type'] == 'expense') {
+        exp += a;
+      }
+    }
+    return (inc, exp);
+  }
+
+  /// Money in/out including lent, borrowed and settlements (full usage).
+  Future<(double, double)> moneyFlow(DateTime from, DateTime to) async {
     double inc = 0;
     double exp = 0;
     for (final r in await _rows(from, to)) {
@@ -67,6 +175,7 @@ extension Stats on AppDatabase {
     final end = DateTime(now.year, now.month + 1, 1);
     final out = List.generate(
         months, (i) => MonthStat(DateTime(start.year, start.month + i, 1)));
+    // Include people money so the 6-month chart reflects real cash movement.
     for (final r in await _rows(start, end)) {
       final d = DateTime.fromMillisecondsSinceEpoch(r['occurred_at'] as int);
       final idx = (d.year - start.year) * 12 + d.month - start.month;
@@ -81,21 +190,33 @@ extension Stats on AppDatabase {
     return out;
   }
 
+  /// Category / people-usage totals. [excludePeople] true for budgets.
   Future<Map<int?, double>> categoryTotals(
-      DateTime from, DateTime to, String type) async {
+      DateTime from, DateTime to, String type,
+      {bool excludePeople = true}) async {
     final m = <int?, double>{};
-    for (final r in await _rows(from, to)) {
+    for (final r in await _rows(from, to, excludePeople: excludePeople)) {
       if (r['type'] != type) continue;
-      final id = r['category_id'] as int?;
+      final id = excludePeople
+          ? r['category_id'] as int?
+          : _usageBucket(r, type);
+      if (id == null && !excludePeople && r['person_id'] != null) continue;
       m[id] = (m[id] ?? 0) + (r['amount'] as num).toDouble();
     }
     return m;
   }
 
+  /// Insights donut: spending/income categories + lent / settle / borrowed buckets.
+  Future<Map<int?, double>> usageBreakdown(
+      DateTime from, DateTime to, String type) {
+    return categoryTotals(from, to, type, excludePeople: false);
+  }
+
   Future<Map<int, double>> dailyTotals(
-      DateTime from, DateTime to, String type) async {
+      DateTime from, DateTime to, String type,
+      {bool excludePeople = false}) async {
     final m = <int, double>{};
-    for (final r in await _rows(from, to)) {
+    for (final r in await _rows(from, to, excludePeople: excludePeople)) {
       if (r['type'] != type) continue;
       final d = DateTime.fromMillisecondsSinceEpoch(r['occurred_at'] as int).day;
       m[d] = (m[d] ?? 0) + (r['amount'] as num).toDouble();
@@ -104,11 +225,11 @@ extension Stats on AppDatabase {
   }
 
   Future<List<(String, double, int)>> topParties(DateTime from, DateTime to,
-      {String type = 'expense', int limit = 5}) async {
+      {String type = 'expense', int limit = 5, bool excludePeople = false}) async {
     final totals = <String, double>{};
     final counts = <String, int>{};
     final names = <String, String>{};
-    for (final r in await _rows(from, to)) {
+    for (final r in await _rows(from, to, excludePeople: excludePeople)) {
       if (r['type'] != type) continue;
       final p = (r['counterparty'] as String?)?.trim();
       if (p == null || p.isEmpty) continue;
@@ -1372,15 +1493,48 @@ class _InsightsScreenState extends State<InsightsScreen> {
     final db = AppDatabase.instance;
     final (s, e) = monthRange(_month);
     final (ps, pe) = monthRange(DateTime(_month.year, _month.month - 1));
-    final cur = await db.incomeExpense(s, e);
-    final prev = await db.incomeExpense(ps, pe);
-    final cats = await db.categoryTotals(s, e, _type);
+    // Full money usage: categories + lent / settle / borrowed.
+    final cur = await db.moneyFlow(s, e);
+    final prev = await db.moneyFlow(ps, pe);
+    final cats = await db.usageBreakdown(s, e, _type);
     final parties = await db.topParties(s, e, type: _type);
     final daily = await db.dailyTotals(s, e, _type);
     final list = cats.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     final inc = _type == 'income';
     return _Insight(inc ? cur.$1 : cur.$2, inc ? prev.$1 : prev.$2, list,
         parties, daily);
+  }
+
+  String _bucketLabel(int? id, TxnState txns) {
+    if (isUsageBucket(id)) return usageBucketName(id);
+    return txns.category(id)?.name ?? 'Needs review';
+  }
+
+  IconData _bucketIcon(int? id, TxnState txns) {
+    if (isUsageBucket(id)) return usageBucketIcon(id);
+    return txns.category(id)?.icon ?? Icons.help_outline_rounded;
+  }
+
+  Color _bucketColor(int? id, TxnState txns, FinColors fin) {
+    if (isUsageBucket(id)) return usageBucketColor(id);
+    return txns.category(id)?.colorValue ?? fin.subtext;
+  }
+
+  Future<List<Txn>> _bucketTxns(int id, DateTime s, DateTime e) async {
+    final db = AppDatabase.instance;
+    if (!isUsageBucket(id)) {
+      return db.txns(categoryId: id, type: _type, from: s, to: e);
+    }
+    final all = await db.txns(type: _type, from: s, to: e);
+    return all.where((t) {
+      if (t.personId == null) return false;
+      final settled = isSettledNote(t.note);
+      if (id == kUsageLentId) return _type == 'expense' && !settled;
+      if (id == kUsageSettledOutId) return _type == 'expense' && settled;
+      if (id == kUsageBorrowedId) return _type == 'income' && !settled;
+      if (id == kUsageSettledInId) return _type == 'income' && settled;
+      return false;
+    }).toList();
   }
 
   void _showCategory(int id, String name) {
@@ -1399,8 +1553,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
           constraints:
               BoxConstraints(maxHeight: MediaQuery.of(c).size.height * 0.75),
           child: FutureBuilder<List<Txn>>(
-            future: AppDatabase.instance
-                .txns(categoryId: id, type: _type, from: s, to: e),
+            future: _bucketTxns(id, s, e),
             builder: (c, snap) {
               final list = snap.data ?? const <Txn>[];
               return ListView(
@@ -1409,6 +1562,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
                 children: [
                   Text(name, style: AppText.display(size: 18, color: fin.text)),
                   const SizedBox(height: 8),
+                  if (list.isEmpty)
+                    Text('No entries in this bucket.',
+                        style: TextStyle(color: fin.subtext)),
                   for (final t in list)
                     TxnTile(
                       txn: t,
