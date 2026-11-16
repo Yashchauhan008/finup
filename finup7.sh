@@ -253,8 +253,6 @@ cat > android/app/src/main/AndroidManifest.xml <<'__END__'
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" tools:ignore="ExactAlarm,ProtectedPermissions"/>
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" tools:ignore="BatteryLife"/>
 
     <queries>
         <intent>
@@ -302,12 +300,11 @@ cat > android/app/src/main/AndroidManifest.xml <<'__END__'
             android:name=".SmsReceiver"
             android:exported="true"
             android:permission="android.permission.BROADCAST_SMS">
-            <intent-filter android:priority="999">
+            <intent-filter>
                 <action android:name="android.provider.Telephony.SMS_RECEIVED"/>
             </intent-filter>
         </receiver>
         <receiver android:name=".NotifActionReceiver" android:exported="false"/>
-        <receiver android:name=".InstallReceiver" android:exported="false"/>
         <receiver android:name=".FinUpWidget" android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
@@ -418,12 +415,9 @@ package com.yash.finup
 
 import android.Manifest
 import android.app.Activity
-import android.app.PendingIntent
-import android.content.BroadcastReceiver
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
@@ -442,8 +436,6 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 
 class MainActivity : FlutterActivity() {
     private val channelName = "finup/native"
@@ -596,16 +588,21 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "openBatterySettings" -> {
+                    // Open the system list only — do not request the privileged
+                    // REQUEST_IGNORE_BATTERY_OPTIMIZATIONS permission (Play Protect signal).
                     if (Build.VERSION.SDK_INT >= 23) {
                         try {
-                            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+                            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
                         } catch (e: Exception) {
-                            try { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } catch (x: Exception) {}
+                            try {
+                                val i = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+                                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                startActivity(i)
+                            } catch (x: Exception) {}
                         }
                     }
                     result.success(true)
                 }
-                "downloadAndInstall" -> downloadAndInstall(call.argument<String>("url") ?: "", result)
                 "canBiometric" -> result.success(canBiometric())
                 "authenticate" -> authenticate(call.argument<String>("reason") ?: "Unlock FinUp", result)
                 "saveDocument" -> {
@@ -715,78 +712,6 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun progress(p: Int) {
-        runOnUiThread { channel?.invokeMethod("updateProgress", p) }
-    }
-
-    private fun downloadAndInstall(url: String, result: MethodChannel.Result) {
-        if (url.isEmpty()) { result.success("error"); return }
-        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
-            val i = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(i)
-            result.success("needs_permission")
-            return
-        }
-        result.success("started")
-        Thread {
-            try {
-                val file = File(cacheDir, "finup-update.apk")
-                var conn = URL(url).openConnection() as HttpURLConnection
-                conn.instanceFollowRedirects = true
-                conn.connectTimeout = 15000
-                conn.readTimeout = 30000
-                conn.setRequestProperty("User-Agent", "FinUp")
-                var hops = 0
-                while (conn.responseCode in 301..308 && hops < 5) {
-                    val loc = conn.getHeaderField("Location") ?: break
-                    conn.disconnect()
-                    conn = URL(loc).openConnection() as HttpURLConnection
-                    conn.setRequestProperty("User-Agent", "FinUp")
-                    hops++
-                }
-                if (conn.responseCode != 200) throw Exception("HTTP ${conn.responseCode}")
-                val total = conn.contentLength.toLong()
-                conn.inputStream.use { input ->
-                    file.outputStream().use { out ->
-                        val buf = ByteArray(64 * 1024)
-                        var read = 0
-                        var done = 0L
-                        var last = -1
-                        while (input.read(buf).also { read = it } != -1) {
-                            out.write(buf, 0, read)
-                            done += read
-                            if (total > 0) {
-                                val pct = (done * 99 / total).toInt()
-                                if (pct != last) { last = pct; progress(pct) }
-                            }
-                        }
-                    }
-                }
-                installApk(file)
-                progress(100)
-            } catch (e: Exception) {
-                progress(-1)
-            }
-        }.start()
-    }
-
-    private fun installApk(file: File) {
-        val installer = packageManager.packageInstaller
-        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-        val sessionId = installer.createSession(params)
-        installer.openSession(sessionId).use { session ->
-            session.openWrite("finup", 0, file.length()).use { out ->
-                file.inputStream().use { it.copyTo(out) }
-                session.fsync(out)
-            }
-            val flags = if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-            else PendingIntent.FLAG_UPDATE_CURRENT
-            val pi = PendingIntent.getBroadcast(this, sessionId, Intent(this, InstallReceiver::class.java), flags)
-            session.commit(pi.intentSender)
-        }
-    }
-
     private fun canBiometric(): Boolean {
         if (Build.VERSION.SDK_INT >= 29) {
             val bm = getSystemService(BiometricManager::class.java) ?: return false
@@ -873,25 +798,12 @@ class MainActivity : FlutterActivity() {
         return out
     }
 }
-
-class InstallReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -999)
-        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
-            @Suppress("DEPRECATION")
-            val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
-            confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(confirm)
-        }
-    }
-}
 __END__
 
 ############################ lib/native.dart (complete) ############################
 cat > lib/native.dart <<'__END__'
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -905,15 +817,9 @@ class RawSms {
 
 class Native {
   static const _ch = MethodChannel('finup/native');
-  static final ValueNotifier<int?> updateProgress = ValueNotifier<int?>(null);
 
   static void init() {
-    _ch.setMethodCallHandler((call) async {
-      if (call.method == 'updateProgress') {
-        updateProgress.value = (call.arguments as num?)?.toInt();
-      }
-      return null;
-    });
+    // Native → Dart callbacks reserved for future use.
   }
 
   static Future<bool> _bool(String method, [Map<String, Object?>? args]) async {
@@ -988,14 +894,6 @@ class Native {
       return ((m?['name'] ?? '').toString(), (m?['code'] as num?)?.toInt() ?? 0);
     } catch (_) {
       return ('', 0);
-    }
-  }
-
-  static Future<String> downloadAndInstall(String url) async {
-    try {
-      return await _ch.invokeMethod<String>('downloadAndInstall', {'url': url}) ?? 'error';
-    } catch (_) {
-      return 'error';
     }
   }
 

@@ -3367,7 +3367,8 @@ The GitHub repository contains only:
 | `finup2.sh` | Part 2: logo, SMS engine, entries, activity, review, reminders |
 | `finup3.sh` | Part 3: dashboard, insights, budgets, goals |
 | `finup4.sh` | Part 4: people ledger, app lock, backup, legal pages, docs |
-| `keys/debug.keystore` | Fixed signing key (created by the first build; keep the repo private) |
+| `scripts/make-release-keystore.sh` | Creates a release keystore and prints GitHub Secrets values |
+| Signing | Via Actions secrets `FINUP_KEYSTORE_BASE64` + passwords (never commit the keystore) |
 
 The scripts write the full Flutter project into `app/`. The workflow then runs
 `flutter create` to add standard Android files, generates the launcher icons,
@@ -3376,12 +3377,13 @@ the complete, ready-to-open Flutter project (this file is inside it).
 
 ## Build an APK (no local install needed)
 
-1. Push changes to GitHub.
-2. GitHub → **Actions** → **Build FinUp** → **Run workflow**.
-3. After about 10 minutes: **Releases** → latest build → download `FinUp.apk`.
-4. Install it over the previous version. Data is kept because the signing key is fixed.
+1. One-time: run `bash scripts/make-release-keystore.sh` and add the printed values as GitHub Actions secrets.
+2. Push changes to GitHub.
+3. GitHub → **Actions** → **Build FinUp** → **Run workflow**.
+4. After about 10 minutes: **Releases** → latest build → download `FinUp.apk`.
+5. Install it over the previous version. Data is kept only if the **same** release keystore signs every build.
 
-Always run `git pull` before pushing, because the first build commits the signing key.
+If you switch from the old debug keystore to a real release keystore, uninstall the old app once (or accept a fresh install). After that, keep the same key forever.
 
 ## Build locally (optional)
 

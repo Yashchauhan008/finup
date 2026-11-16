@@ -1085,7 +1085,7 @@ if [ -f "$MANIFEST" ]; then
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/finup_w_budget_info"/>
+                android:resource="\@xml/finup_w_budget_info"/>
         </receiver>
         <receiver android:name=".AccountsWidget" android:exported="false">
             <intent-filter>
@@ -1093,7 +1093,7 @@ if [ -f "$MANIFEST" ]; then
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/finup_w_accounts_info"/>
+                android:resource="\@xml/finup_w_accounts_info"/>
         </receiver>
         <receiver android:name=".PeopleBalanceWidget" android:exported="false">
             <intent-filter>
@@ -1101,7 +1101,7 @@ if [ -f "$MANIFEST" ]; then
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/finup_w_people_info"/>
+                android:resource="\@xml/finup_w_people_info"/>
         </receiver>
         <receiver android:name=".WeekCompareWidget" android:exported="false">
             <intent-filter>
@@ -1109,7 +1109,7 @@ if [ -f "$MANIFEST" ]; then
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/finup_w_week_info"/>
+                android:resource="\@xml/finup_w_week_info"/>
         </receiver>
         <receiver android:name=".ReviewInboxWidget" android:exported="false">
             <intent-filter>
@@ -1117,7 +1117,7 @@ if [ -f "$MANIFEST" ]; then
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/finup_w_review_info"/>
+                android:resource="\@xml/finup_w_review_info"/>
         </receiver>}s' "$MANIFEST"
   fi
 fi
@@ -1166,23 +1166,28 @@ __END__
 fi
 
 ############################ Fail-fast checks ############################
-# Use @ as separator so patterns may contain ':' (Kotlin types, etc.)
+# Use | as separator so patterns may contain ':' and '@'
 for check in \
-  "FinUpWidgets.refreshAll@android/app/src/main/kotlin/com/yash/finup/MainActivity.kt" \
-  "FinUpWidgets.refreshAll@android/app/src/main/kotlin/com/yash/finup/FinUpWidget.kt" \
-  "BudgetPulseWidget@android/app/src/main/AndroidManifest.xml" \
-  "AccountsWidget@android/app/src/main/AndroidManifest.xml" \
-  "PeopleBalanceWidget@android/app/src/main/AndroidManifest.xml" \
-  "WeekCompareWidget@android/app/src/main/AndroidManifest.xml" \
-  "ReviewInboxWidget@android/app/src/main/AndroidManifest.xml" \
-  "case 'budgets':@lib/actions/quick_actions.dart" \
-  "case 'people':@lib/actions/quick_actions.dart" \
-  "case 'insights':@lib/actions/quick_actions.dart" \
-  "w_prog1@android/app/src/main/res/layout/finup_w_budget.xml" \
-  "w_name4@android/app/src/main/res/layout/finup_w_accounts.xml" \
-  "More home screen widgets@USER_GUIDE.md"
+  "FinUpWidgets.refreshAll|android/app/src/main/kotlin/com/yash/finup/MainActivity.kt" \
+  "FinUpWidgets.refreshAll|android/app/src/main/kotlin/com/yash/finup/FinUpWidget.kt" \
+  "BudgetPulseWidget|android/app/src/main/AndroidManifest.xml" \
+  "@xml/finup_w_budget_info|android/app/src/main/AndroidManifest.xml" \
+  "@xml/finup_w_accounts_info|android/app/src/main/AndroidManifest.xml" \
+  "@xml/finup_w_people_info|android/app/src/main/AndroidManifest.xml" \
+  "@xml/finup_w_week_info|android/app/src/main/AndroidManifest.xml" \
+  "@xml/finup_w_review_info|android/app/src/main/AndroidManifest.xml" \
+  "AccountsWidget|android/app/src/main/AndroidManifest.xml" \
+  "PeopleBalanceWidget|android/app/src/main/AndroidManifest.xml" \
+  "WeekCompareWidget|android/app/src/main/AndroidManifest.xml" \
+  "ReviewInboxWidget|android/app/src/main/AndroidManifest.xml" \
+  "case 'budgets':|lib/actions/quick_actions.dart" \
+  "case 'people':|lib/actions/quick_actions.dart" \
+  "case 'insights':|lib/actions/quick_actions.dart" \
+  "w_prog1|android/app/src/main/res/layout/finup_w_budget.xml" \
+  "w_name4|android/app/src/main/res/layout/finup_w_accounts.xml" \
+  "More home screen widgets|USER_GUIDE.md"
 do
-  pat="${check%%@*}"; file="${check#*@}"
+  pat="${check%%|*}"; file="${check#*|}"
   if [ ! -f "$file" ] || ! grep -qF "$pat" "$file"; then
     echo "ERROR: patch failed in $file ($pat)"
     exit 1

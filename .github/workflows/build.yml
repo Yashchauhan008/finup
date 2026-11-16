@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+      FINUP_STORE_PASSWORD: ${{ secrets.FINUP_STORE_PASSWORD }}
+      FINUP_KEY_PASSWORD: ${{ secrets.FINUP_KEY_PASSWORD }}
+      FINUP_KEY_ALIAS: ${{ secrets.FINUP_KEY_ALIAS }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,21 +35,24 @@ jobs:
       - name: Icon tools
         run: sudo apt-get update -qq && sudo apt-get install -y -qq librsvg2-bin zip
 
-      - name: Fixed signing key (same key for every build)
+      - name: Decode release keystore from secrets
+        env:
+          FINUP_KEYSTORE_BASE64: ${{ secrets.FINUP_KEYSTORE_BASE64 }}
         run: |
-          if [ ! -f keys/debug.keystore ]; then
-            mkdir -p keys
-            keytool -genkeypair -v -keystore keys/debug.keystore -storepass android \
-              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
-              -validity 10000 -dname "CN=FinUp,O=FinUp,C=IN"
-            git config user.name "github-actions"
-            git config user.email "github-actions@users.noreply.github.com"
-            git add keys/debug.keystore
-            git commit -m "Add fixed signing key [skip ci]"
-            git push
+          set -euo pipefail
+          if [ -z "${FINUP_KEYSTORE_BASE64:-}" ] || [ -z "${FINUP_STORE_PASSWORD:-}" ] || [ -z "${FINUP_KEY_PASSWORD:-}" ]; then
+            echo "::error::Missing signing secrets. Run scripts/make-release-keystore.sh locally, then add:"
+            echo "  FINUP_KEYSTORE_BASE64, FINUP_STORE_PASSWORD, FINUP_KEY_PASSWORD, FINUP_KEY_ALIAS"
+            exit 1
           fi
-          mkdir -p ~/.android
-          cp keys/debug.keystore ~/.android/debug.keystore
+          mkdir -p keys
+          echo "$FINUP_KEYSTORE_BASE64" | base64 -d > keys/finup-release.jks
+          # Default alias if secret omitted
+          if [ -z "${FINUP_KEY_ALIAS:-}" ]; then
+            echo "FINUP_KEY_ALIAS=finup" >> "$GITHUB_ENV"
+          fi
+          keytool -list -keystore keys/finup-release.jks -storepass "$FINUP_STORE_PASSWORD" >/dev/null
+          echo "Release keystore decoded OK"
 
       - name: Generate app source
         run: |
@@ -58,7 +64,7 @@ jobs:
       - name: Create Android project, icons, signing, build APK
         working-directory: app
         env:
-          FINUP_KEYSTORE: ${{ github.workspace }}/keys/debug.keystore
+          FINUP_KEYSTORE: ${{ github.workspace }}/keys/finup-release.jks
         run: |
           flutter create --project-name finup --org com.yash --platforms android .
           rm -rf test
@@ -66,6 +72,13 @@ jobs:
           python3 - <<'PY'
           import os, pathlib
           ks = os.environ["FINUP_KEYSTORE"]
+          store = os.environ["FINUP_STORE_PASSWORD"]
+          key = os.environ["FINUP_KEY_PASSWORD"]
+          alias = os.environ.get("FINUP_KEY_ALIAS") or "finup"
+          # Escape for embedding in Gradle strings
+          def esc(s: str) -> str:
+              return s.replace("\\", "\\\\").replace('"', '\\"')
+          store_e, key_e, alias_e = esc(store), esc(key), esc(alias)
           kts = pathlib.Path("android/app/build.gradle.kts")
           groovy = pathlib.Path("android/app/build.gradle")
           if kts.exists():
@@ -73,9 +86,9 @@ jobs:
               block = ('    signingConfigs {\n'
                        '        create("finup") {\n'
                        f'            storeFile = file("{ks}")\n'
-                       '            storePassword = "android"\n'
-                       '            keyAlias = "androiddebugkey"\n'
-                       '            keyPassword = "android"\n'
+                       f'            storePassword = "{store_e}"\n'
+                       f'            keyAlias = "{alias_e}"\n'
+                       f'            keyPassword = "{key_e}"\n'
                        '        }\n'
                        '    }\n\n')
               if 'create("finup")' not in s:
@@ -88,9 +101,9 @@ jobs:
               block = ("    signingConfigs {\n"
                        "        finup {\n"
                        f"            storeFile file('{ks}')\n"
-                       "            storePassword 'android'\n"
-                       "            keyAlias 'androiddebugkey'\n"
-                       "            keyPassword 'android'\n"
+                       f"            storePassword '{store.replace(chr(39), chr(39)+chr(39))}'\n"
+                       f"            keyAlias '{alias.replace(chr(39), chr(39)+chr(39))}'\n"
+                       f"            keyPassword '{key.replace(chr(39), chr(39)+chr(39))}'\n"
                        "        }\n"
                        "    }\n\n")
               if "        finup {" not in s:
@@ -102,7 +115,7 @@ jobs:
               raise SystemExit("No android/app/build.gradle(.kts) found")
           if not ok:
               raise SystemExit("Could not apply FinUp signing config")
-          print("FinUp signing config applied with", ks)
+          print("FinUp release signing config applied with", ks, "alias", alias)
           PY
           flutter pub get
           flutter build apk --release --build-number=${{ github.run_number }} --build-name=2.1.${{ github.run_number }}
@@ -113,7 +126,7 @@ jobs:
           if [ -n "$APKSIGNER" ]; then
             "$APKSIGNER" verify --print-certs app/build/app/outputs/flutter-apk/app-release.apk | grep -i "SHA-256" || true
           fi
-          keytool -list -v -keystore keys/debug.keystore -storepass android | grep -i "SHA256" || true
+          keytool -list -v -keystore keys/finup-release.jks -storepass "$FINUP_STORE_PASSWORD" | grep -i "SHA256" || true
 
       - name: Package APK and source zip
         run: |

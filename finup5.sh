@@ -15,8 +15,6 @@ cat > android/app/src/main/AndroidManifest.xml <<'__END__'
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" tools:ignore="ExactAlarm,ProtectedPermissions"/>
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" tools:ignore="BatteryLife"/>
 
     <application
         android:label="FinUp"
@@ -48,12 +46,11 @@ cat > android/app/src/main/AndroidManifest.xml <<'__END__'
             android:name=".SmsReceiver"
             android:exported="true"
             android:permission="android.permission.BROADCAST_SMS">
-            <intent-filter android:priority="999">
+            <intent-filter>
                 <action android:name="android.provider.Telephony.SMS_RECEIVED"/>
             </intent-filter>
         </receiver>
         <receiver android:name=".NotifActionReceiver" android:exported="false"/>
-        <receiver android:name=".InstallReceiver" android:exported="false"/>
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
@@ -468,12 +465,9 @@ package com.yash.finup
 
 import android.Manifest
 import android.app.Activity
-import android.app.PendingIntent
-import android.content.BroadcastReceiver
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
@@ -486,9 +480,6 @@ import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 
 class MainActivity : FlutterActivity() {
     private val channelName = "finup/native"
@@ -588,14 +579,17 @@ class MainActivity : FlutterActivity() {
                 "openBatterySettings" -> {
                     if (Build.VERSION.SDK_INT >= 23) {
                         try {
-                            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+                            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
                         } catch (e: Exception) {
-                            try { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } catch (x: Exception) {}
+                            try {
+                                val i = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+                                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                startActivity(i)
+                            } catch (x: Exception) {}
                         }
                     }
                     result.success(true)
                 }
-                "downloadAndInstall" -> downloadAndInstall(call.argument<String>("url") ?: "", result)
                 "canBiometric" -> result.success(canBiometric())
                 "authenticate" -> authenticate(call.argument<String>("reason") ?: "Unlock FinUp", result)
                 "saveDocument" -> {
@@ -696,78 +690,6 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun progress(p: Int) {
-        runOnUiThread { channel?.invokeMethod("updateProgress", p) }
-    }
-
-    private fun downloadAndInstall(url: String, result: MethodChannel.Result) {
-        if (url.isEmpty()) { result.success("error"); return }
-        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
-            val i = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(i)
-            result.success("needs_permission")
-            return
-        }
-        result.success("started")
-        Thread {
-            try {
-                val file = File(cacheDir, "finup-update.apk")
-                var conn = URL(url).openConnection() as HttpURLConnection
-                conn.instanceFollowRedirects = true
-                conn.connectTimeout = 15000
-                conn.readTimeout = 30000
-                conn.setRequestProperty("User-Agent", "FinUp")
-                var hops = 0
-                while (conn.responseCode in 301..308 && hops < 5) {
-                    val loc = conn.getHeaderField("Location") ?: break
-                    conn.disconnect()
-                    conn = URL(loc).openConnection() as HttpURLConnection
-                    conn.setRequestProperty("User-Agent", "FinUp")
-                    hops++
-                }
-                if (conn.responseCode != 200) throw Exception("HTTP ${conn.responseCode}")
-                val total = conn.contentLength.toLong()
-                conn.inputStream.use { input ->
-                    file.outputStream().use { out ->
-                        val buf = ByteArray(64 * 1024)
-                        var read = 0
-                        var done = 0L
-                        var last = -1
-                        while (input.read(buf).also { read = it } != -1) {
-                            out.write(buf, 0, read)
-                            done += read
-                            if (total > 0) {
-                                val pct = (done * 99 / total).toInt()
-                                if (pct != last) { last = pct; progress(pct) }
-                            }
-                        }
-                    }
-                }
-                installApk(file)
-                progress(100)
-            } catch (e: Exception) {
-                progress(-1)
-            }
-        }.start()
-    }
-
-    private fun installApk(file: File) {
-        val installer = packageManager.packageInstaller
-        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-        val sessionId = installer.createSession(params)
-        installer.openSession(sessionId).use { session ->
-            session.openWrite("finup", 0, file.length()).use { out ->
-                file.inputStream().use { it.copyTo(out) }
-                session.fsync(out)
-            }
-            val flags = if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-            else PendingIntent.FLAG_UPDATE_CURRENT
-            val pi = PendingIntent.getBroadcast(this, sessionId, Intent(this, InstallReceiver::class.java), flags)
-            session.commit(pi.intentSender)
-        }
-    }
-
     private fun canBiometric(): Boolean {
         if (Build.VERSION.SDK_INT >= 29) {
             val bm = getSystemService(BiometricManager::class.java) ?: return false
@@ -854,25 +776,12 @@ class MainActivity : FlutterActivity() {
         return out
     }
 }
-
-class InstallReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -999)
-        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
-            @Suppress("DEPRECATION")
-            val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
-            confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(confirm)
-        }
-    }
-}
 __END__
 
 ############################ lib/native.dart (complete) ############################
 cat > lib/native.dart <<'__END__'
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -887,16 +796,8 @@ class RawSms {
 class Native {
   static const _ch = MethodChannel('finup/native');
 
-  /// Download progress for in-app updates: 0..99 downloading, 100 installing, -1 failed.
-  static final ValueNotifier<int?> updateProgress = ValueNotifier<int?>(null);
-
   static void init() {
-    _ch.setMethodCallHandler((call) async {
-      if (call.method == 'updateProgress') {
-        updateProgress.value = (call.arguments as num?)?.toInt();
-      }
-      return null;
-    });
+    // Native → Dart callbacks reserved for future use.
   }
 
   static Future<bool> _bool(String method, [Map<String, Object?>? args]) async {
@@ -958,14 +859,6 @@ class Native {
       return ((m?['name'] ?? '').toString(), (m?['code'] as num?)?.toInt() ?? 0);
     } catch (_) {
       return ('', 0);
-    }
-  }
-
-  static Future<String> downloadAndInstall(String url) async {
-    try {
-      return await _ch.invokeMethod<String>('downloadAndInstall', {'url': url}) ?? 'error';
-    } catch (_) {
-      return 'error';
     }
   }
 
@@ -1226,12 +1119,10 @@ class _UpdateScreenState extends State<UpdateScreen> {
   String _curName = '';
   int _cur = 0;
   String? _msg;
-  bool _started = false;
 
   @override
   void initState() {
     super.initState();
-    Native.updateProgress.value = null;
     _check();
   }
 
@@ -1249,26 +1140,24 @@ class _UpdateScreenState extends State<UpdateScreen> {
       _info = info;
       _checking = false;
       if (info == null) {
-        _msg = 'Could not reach the updates page. Check your internet connection and that the finup-releases repo is set up.';
+        _msg =
+            'Could not reach the updates page. Check your internet connection and that the finup-releases repo is set up.';
       }
     });
   }
 
   bool get _hasUpdate => _info != null && _info!.build > _cur;
 
-  Future<void> _update() async {
-    final r = await AppLockGate.suspendWhile(
-        () => Native.downloadAndInstall(_info!.apkUrl));
+  Future<void> _openDownload() async {
+    final url = (_info?.apkUrl.isNotEmpty == true)
+        ? _info!.apkUrl
+        : UpdateService.pageUrl;
+    final ok = await AppLockGate.suspendWhile(() => Native.openUrl(url));
     if (!mounted) return;
     setState(() {
-      if (r == 'needs_permission') {
-        _msg = 'Allow "Install unknown apps" for FinUp on the screen that opened, come back, then tap Update again.';
-      } else if (r == 'started') {
-        _started = true;
-        _msg = null;
-      } else {
-        _msg = 'Could not start the download. Please try again.';
-      }
+      _msg = ok
+          ? 'Browser opened. Download the APK there, then install it with Android. FinUp never installs APKs itself.'
+          : 'Could not open the download page. Try again, or visit GitHub releases manually.';
     });
   }
 
@@ -1286,7 +1175,9 @@ class _UpdateScreenState extends State<UpdateScreen> {
             child: Text(
               _checking
                   ? 'Checking for updates…'
-                  : (_hasUpdate ? 'Update available' : (_info == null ? 'Could not check' : 'You are up to date')),
+                  : (_hasUpdate
+                      ? 'Update available'
+                      : (_info == null ? 'Could not check' : 'You are up to date')),
               style: AppText.display(size: 22, color: fin.text),
             ),
           ),
@@ -1309,62 +1200,35 @@ class _UpdateScreenState extends State<UpdateScreen> {
                 children: [
                   Text(_info!.name,
                       style: TextStyle(
-                          color: fin.text, fontWeight: FontWeight.w700, fontSize: 16)),
+                          color: fin.text,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16)),
                   const SizedBox(height: 4),
-                  Text('Build ${_info!.build}', style: TextStyle(color: fin.subtext)),
+                  Text('Build ${_info!.build}',
+                      style: TextStyle(color: fin.subtext)),
                   if (_info!.notes.trim().isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text("What's new",
-                        style: TextStyle(color: fin.text, fontWeight: FontWeight.w600)),
+                        style: TextStyle(
+                            color: fin.text, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 4),
-                    Text(_info!.notes, style: TextStyle(color: fin.subtext, height: 1.5)),
+                    Text(_info!.notes,
+                        style: TextStyle(color: fin.subtext, height: 1.5)),
                   ],
                 ],
               ),
             ),
             const SizedBox(height: 20),
-            ValueListenableBuilder<int?>(
-              valueListenable: Native.updateProgress,
-              builder: (context, p, _) {
-                if (!_started) {
-                  return PrimaryButton(
-                      label: 'Download and install',
-                      icon: Icons.system_update_rounded,
-                      onPressed: _update);
-                }
-                if (p == -1) {
-                  return Column(children: [
-                    const Text('Download failed.',
-                        style: TextStyle(color: AppColors.expense)),
-                    const SizedBox(height: 10),
-                    PrimaryButton(
-                        label: 'Try again',
-                        icon: Icons.refresh_rounded,
-                        onPressed: _update),
-                  ]);
-                }
-                final v = (p ?? 0).clamp(0, 100).toDouble() / 100;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                          value: p == null ? null : v,
-                          minHeight: 10,
-                          backgroundColor: fin.divider,
-                          color: AppColors.lavender),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      p == 100
-                          ? 'Downloaded. Tap Update on the Android screen to finish.'
-                          : 'Downloading… ${(v * 100).round()}%',
-                      style: TextStyle(color: fin.text, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                );
-              },
+            PrimaryButton(
+              label: 'Open download page',
+              icon: Icons.open_in_browser_rounded,
+              onPressed: _openDownload,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'FinUp opens the release in your browser. You download and install the APK there — the app does not install packages itself (safer for Play Protect).',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: fin.subtext, height: 1.45, fontSize: 13),
             ),
           ],
           if (_msg != null) ...[
@@ -1374,7 +1238,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
                 style: TextStyle(color: fin.subtext, height: 1.5)),
           ],
           const SizedBox(height: 24),
-          if (!_checking && !_started)
+          if (!_checking)
             Center(
               child: TextButton.icon(
                   onPressed: _check,
@@ -1383,8 +1247,8 @@ class _UpdateScreenState extends State<UpdateScreen> {
             ),
           Center(
             child: TextButton.icon(
-              onPressed: () =>
-                  AppLockGate.suspendWhile(() => Native.shareText(UpdateService.shareText)),
+              onPressed: () => AppLockGate.suspendWhile(
+                  () => Native.shareText(UpdateService.shareText)),
               icon: const Icon(Icons.share_rounded),
               label: const Text('Share FinUp'),
             ),
@@ -1745,7 +1609,7 @@ cat >> USER_GUIDE.md <<'__END__'
 
 ## 14. Updates and sharing
 - Settings → **Check for updates** (FinUp also checks once a day).
-- Tap **Download and install**. The first time, Android asks you to allow "Install unknown apps" for FinUp. Then confirm Android's "Update" screen. Your data is kept.
+- Tap **Open download page**. Your browser downloads the APK; install it from there. FinUp does not install APKs itself (Play Protect friendly).
 - **Share FinUp** sends the download link. Each person's data stays on their own phone.
 
 ## 15. About
@@ -1754,24 +1618,26 @@ __END__
 
 cat >> SETUP.md <<'__END__'
 
-## In-app updates (Part 5)
+## Updates (Part 5) — browser download only
 
 - Builds are numbered with the GitHub run number (`--build-number`), so each build is newer than the last.
 - The workflow publishes `FinUp.apk` to the **public** repo `Yashchauhan008/finup-releases` using the secret `RELEASES_TOKEN`.
-  The private repo keeps the source zip and signing key.
 - The app reads `https://api.github.com/repos/Yashchauhan008/finup-releases/releases/latest`,
-  compares the tag number with its own version code, downloads the APK and installs it with Android's PackageInstaller.
+  compares the tag with its version code, then opens the release/APK URL in the **browser**.
+- FinUp does **not** use `REQUEST_INSTALL_PACKAGES` or PackageInstaller (Play Protect).
 - When running the workflow, fill in **What's new**. It is shown on the in-app update screen.
 
 ### One-time setup
 1. Create the public repo `finup-releases` (with a README so it is not empty).
 2. Create a fine-grained token with **Contents: Read and write** on that repo only.
 3. Add it to the private `finup` repo as the Actions secret `RELEASES_TOKEN`.
+4. Add release signing secrets (see `scripts/make-release-keystore.sh`):
+   `FINUP_KEYSTORE_BASE64`, `FINUP_STORE_PASSWORD`, `FINUP_KEY_PASSWORD`, `FINUP_KEY_ALIAS`.
 
 ## Native files (Part 5)
 - `Alerts.kt`: SMS receiver, native SMS parser, category suggestions, notification buttons.
 - `Reminder.kt`: exact daily reminder with the pending count.
-- `MainActivity.kt`: method channel, downloads and installs updates, files, sharing, fingerprint.
+- `MainActivity.kt`: method channel, files, sharing, fingerprint (no APK installer).
 __END__
 
 echo "FinUp Part 5 applied."
