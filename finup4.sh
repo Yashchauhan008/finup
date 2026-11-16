@@ -3332,8 +3332,11 @@ class FinUpApp extends StatelessWidget {
 __END__
 
 ############################ Patches to earlier parts ############################
-# 1) Lending/borrowing (person-linked transactions) is excluded from spending/income stats
-sed -i "s#where: 'occurred_at >= ? AND occurred_at < ?',#where: 'occurred_at >= ? AND occurred_at < ? AND person_id IS NULL',#" lib/data/stats.dart
+# 1) Lending/borrowing (person-linked transactions) is excluded from spending/income stats.
+# Part 3 may already ship excludePeople on _rows; only patch the old single-where shape.
+if grep -qF "where: 'occurred_at >= ? AND occurred_at < ?'," lib/data/stats.dart; then
+  sed -i "s#where: 'occurred_at >= ? AND occurred_at < ?',#where: 'occurred_at >= ? AND occurred_at < ? AND person_id IS NULL',#" lib/data/stats.dart
+fi
 sed -i "s#WHERE type = 'expense' AND occurred_at >= ? AND occurred_at < ?#WHERE type = 'expense' AND person_id IS NULL AND occurred_at >= ? AND occurred_at < ?#" lib/data/db.dart
 
 # 2) Auto-link SMS payments to people after every sync
@@ -3344,9 +3347,10 @@ sed -i "s#n = await SmsSync.run(sinceMs: sinceMs);#n = await SmsSync.run(sinceMs
 perl -0777 -pi -e 's{ActionChip\(\s*avatar: const Icon\(Icons\.more_horiz_rounded, size: 16\),}{ActionChip(avatar: const Icon(Icons.person_add_alt_1_rounded, size: 16), label: const Text(\x27Lend / Borrow\x27), onPressed: () => linkTxnToPerson(context, txn)), ActionChip(avatar: const Icon(Icons.more_horiz_rounded, size: 16),}s' lib/screens/review_screen.dart
 sed -i "s#import 'add_txn_screen.dart';#import 'add_txn_screen.dart';\nimport 'people_screen.dart';#" lib/screens/review_screen.dart
 
-for check in "person_id IS NULL',:lib/data/stats.dart" "autoLinkPeople:lib/state/txn_state.dart" "linkTxnToPerson:lib/screens/review_screen.dart"; do
-  pat="${check%%:*}"; file="${check#*:}"
-  if ! grep -q "$pat" "$file"; then echo "ERROR: Part 4 patch failed in $file"; exit 1; fi
+# Use | so patterns may contain ':' (e.g. person_id IS NULL in ternary / patched where)
+for check in "person_id IS NULL|lib/data/stats.dart" "autoLinkPeople|lib/state/txn_state.dart" "linkTxnToPerson|lib/screens/review_screen.dart"; do
+  pat="${check%%|*}"; file="${check#*|}"
+  if ! grep -qF "$pat" "$file"; then echo "ERROR: Part 4 patch failed in $file ($pat)"; exit 1; fi
 done
 
 ############################ DOCS ############################
