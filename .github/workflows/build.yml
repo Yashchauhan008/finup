@@ -57,7 +57,7 @@ jobs:
       - name: Generate app source
         run: |
           bash finup.sh
-          for n in 2 3 4 5 6 7 8 9 10; do
+          for n in 2 3 4 5 6 7 8 9 10 11; do
             if [ -f "finup$n.sh" ]; then bash "finup$n.sh"; fi
           done
 
@@ -147,7 +147,12 @@ jobs:
           print("Disabled lintVital for release builds")
           PY
           flutter pub get
-          flutter build apk --release --build-number=${{ github.run_number }} --build-name=2.1.${{ github.run_number }}
+          # Phone ABIs only — drop x86/x86_64 emulator libs (~40MB+). Huge APKs
+          # often truncate on download and Android then closes install with no error.
+          flutter build apk --release \
+            --target-platform android-arm,android-arm64 \
+            --build-number=${{ github.run_number }} \
+            --build-name=2.1.${{ github.run_number }}
 
       - name: Show signing fingerprint (must be the same every build)
         run: |
@@ -156,6 +161,22 @@ jobs:
             "$APKSIGNER" verify --print-certs app/build/app/outputs/flutter-apk/app-release.apk | grep -i "SHA-256" || true
           fi
           keytool -list -v -keystore keys/finup-release.jks -storepass "$FINUP_STORE_PASSWORD" | grep -i "SHA256" || true
+          ls -lh app/build/app/outputs/flutter-apk/app-release.apk
+          python3 - <<'PY'
+          import zipfile, os, sys
+          path = "app/build/app/outputs/flutter-apk/app-release.apk"
+          size = os.path.getsize(path)
+          z = zipfile.ZipFile(path)
+          bad = z.testzip()
+          abis = sorted({n.split("/")[1] for n in z.namelist() if n.startswith("lib/") and n.count("/") >= 2})
+          print(f"APK size={size} bytes ({size/1e6:.1f} MB) abis={abis} corrupt={bad}")
+          if bad is not None:
+              raise SystemExit(f"APK zip corrupt: {bad}")
+          if "x86" in abis or "x86_64" in abis:
+              raise SystemExit(f"Unexpected emulator ABIs in release APK: {abis}")
+          if size > 95_000_000:
+              print("::warning::APK still larger than 95MB; downloads may truncate on slow networks")
+          PY
 
       - name: Package APK and source zip
         run: |
