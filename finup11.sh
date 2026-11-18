@@ -116,17 +116,25 @@ class UpdateService {
       int? bytes;
       final assets = j['assets'];
       if (assets is List) {
+        Map? preferred;
+        Map? fallback;
         for (final a in assets) {
-          if (a is Map) {
-            final n = (a['name'] ?? '').toString().toLowerCase();
-            if (n.endsWith('.apk')) {
-              url = a['browser_download_url']?.toString();
-              final s = a['size'];
-              if (s is int) bytes = s;
-              if (s is num) bytes = s.toInt();
-              break;
-            }
+          if (a is! Map) continue;
+          final n = (a['name'] ?? '').toString().toLowerCase();
+          if (!n.endsWith('.apk')) continue;
+          // Prefer 64-bit phone APK; avoid arm32 / universal fallbacks.
+          if (n == 'finup.apk' || n.contains('arm64')) {
+            preferred = a;
+            break;
           }
+          fallback ??= a;
+        }
+        final a = preferred ?? fallback;
+        if (a != null) {
+          url = a['browser_download_url']?.toString();
+          final s = a['size'];
+          if (s is int) bytes = s;
+          if (s is num) bytes = s.toInt();
         }
       }
       if (url == null) return null;
