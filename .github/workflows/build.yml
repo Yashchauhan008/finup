@@ -117,6 +117,46 @@ jobs:
               raise SystemExit("Could not apply FinUp signing config")
           print("FinUp release signing config applied with", ks, "alias", alias)
 
+          # Force phone ABIs only. ML Kit / Flutter still try to ship x86_64 otherwise.
+          for gradle in (kts, groovy):
+              if not gradle.exists():
+                  continue
+              g = gradle.read_text()
+              if "abiFilters" in g:
+                  continue
+              if gradle == kts:
+                  ndk = (
+                      "\n        ndk {\n"
+                      '            abiFilters += listOf("armeabi-v7a", "arm64-v8a")\n'
+                      "        }\n"
+                  )
+              else:
+                  ndk = (
+                      "\n        ndk {\n"
+                      "            abiFilters 'armeabi-v7a', 'arm64-v8a'\n"
+                      "        }\n"
+                  )
+              needle = "        versionName ="
+              alt = "        versionName "
+              if needle in g:
+                  # insert after versionName line inside defaultConfig
+                  lines = g.splitlines(True)
+                  out = []
+                  done = False
+                  for line in lines:
+                      out.append(line)
+                      if not done and line.strip().startswith("versionName"):
+                          out.append(ndk)
+                          done = True
+                  if not done:
+                      raise SystemExit("Could not insert ndk abiFilters")
+                  gradle.write_text("".join(out))
+              elif "defaultConfig {" in g:
+                  gradle.write_text(g.replace("defaultConfig {", "defaultConfig {" + ndk, 1))
+              else:
+                  raise SystemExit("No defaultConfig to attach abiFilters")
+              print("Applied phone-only ndk abiFilters in", gradle)
+
           # Avoid Flutter plugin lintVital crashes (e.g. image_picker_android NoSuchMethodError)
           props = pathlib.Path("android/gradle.properties")
           props_text = props.read_text() if props.exists() else ""
@@ -172,8 +212,11 @@ jobs:
           print(f"APK size={size} bytes ({size/1e6:.1f} MB) abis={abis} corrupt={bad}")
           if bad is not None:
               raise SystemExit(f"APK zip corrupt: {bad}")
-          if "x86" in abis or "x86_64" in abis:
+          unexpected = [a for a in abis if a.startswith("x86")]
+          if unexpected:
               raise SystemExit(f"Unexpected emulator ABIs in release APK: {abis}")
+          if not {"armeabi-v7a", "arm64-v8a"} <= set(abis):
+              raise SystemExit(f"Missing required phone ABIs: {abis}")
           if size > 95_000_000:
               print("::warning::APK still larger than 95MB; downloads may truncate on slow networks")
           PY
