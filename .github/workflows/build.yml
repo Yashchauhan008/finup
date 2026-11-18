@@ -57,7 +57,7 @@ jobs:
       - name: Generate app source
         run: |
           bash finup.sh
-          for n in 2 3 4 5 6 7 8 9 10 11 12; do
+          for n in 2 3 4 5 6 7 8 9 10 11 12 13; do
             if [ -f "finup$n.sh" ]; then bash "finup$n.sh"; fi
           done
 
@@ -184,7 +184,7 @@ jobs:
           cp app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk FinUp.apk
           ls -lh FinUp.apk
 
-      - name: Publish release (APK only)
+      - name: Publish release (FinUp.apk only — no source zip/gz)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
@@ -196,6 +196,25 @@ jobs:
             Download **FinUp.apk**, wait until the full file finishes, then install.
             A partial download shows “App not installed”.
           files: FinUp.apk
+          fail_on_unmatched_files: true
+
+      - name: Verify release assets are APK-only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="build-${{ github.run_number }}"
+          gh api "repos/${{ github.repository }}/releases/tags/$tag" --jq '[.assets[].name]' > /tmp/finup-assets.json
+          cat /tmp/finup-assets.json
+          python3 - <<'PY'
+          import json
+          names = json.load(open("/tmp/finup-assets.json"))
+          bad = [n for n in names if n != "FinUp.apk"]
+          if names != ["FinUp.apk"]:
+              raise SystemExit(f"Expected only FinUp.apk, got {names}")
+          if any(n.lower().endswith((".zip", ".gz", ".tgz", ".tar")) for n in names):
+              raise SystemExit(f"Source archives not allowed: {names}")
+          print("Release asset check OK:", names)
+          PY
 
       - name: Publish APK to public updates repo
         if: env.RELEASES_TOKEN != ''
@@ -207,3 +226,4 @@ jobs:
           name: FinUp 2.1.${{ github.run_number }}
           body: ${{ inputs.notes }}
           files: FinUp.apk
+          fail_on_unmatched_files: true
