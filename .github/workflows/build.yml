@@ -57,7 +57,7 @@ jobs:
       - name: Generate app source
         run: |
           bash finup.sh
-          for n in 2 3 4 5 6 7 8 9 10 11; do
+          for n in 2 3 4 5 6 7 8 9 10 11 12; do
             if [ -f "finup$n.sh" ]; then bash "finup$n.sh"; fi
           done
 
@@ -147,11 +147,9 @@ jobs:
           print("Disabled lintVital for release builds")
           PY
           flutter pub get
-          # Split per ABI. Universal APKs were ~114MB (x86 + ML Kit) and often
-          # truncated on download → Android installer closes with “App not installed”.
-          # Ship arm64 as FinUp.apk (almost all phones) + arm32 for older devices.
+          # Single phone APK only (arm64). No universal fat APK, no source zip in release.
           flutter build apk --release --split-per-abi \
-            --target-platform android-arm,android-arm64 \
+            --target-platform android-arm64 \
             --build-number=${{ github.run_number }} \
             --build-name=2.1.${{ github.run_number }}
 
@@ -159,44 +157,34 @@ jobs:
         run: |
           APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)
           ARM64=app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-          ARM32=app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
           test -f "$ARM64"
-          test -f "$ARM32"
           if [ -n "$APKSIGNER" ]; then
             "$APKSIGNER" verify --print-certs "$ARM64" | grep -i "SHA-256" || true
           fi
           keytool -list -v -keystore keys/finup-release.jks -storepass "$FINUP_STORE_PASSWORD" | grep -i "SHA256" || true
-          ls -lh "$ARM64" "$ARM32"
+          ls -lh "$ARM64"
           python3 - <<'PY'
           import zipfile, os
-          for path, need in [
-              ("app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk", {"arm64-v8a"}),
-              ("app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk", {"armeabi-v7a"}),
-          ]:
-              size = os.path.getsize(path)
-              z = zipfile.ZipFile(path)
-              bad = z.testzip()
-              abis = sorted({n.split("/")[1] for n in z.namelist() if n.startswith("lib/") and n.count("/") >= 2})
-              print(f"{path}: size={size} ({size/1e6:.1f} MB) abis={abis} corrupt={bad}")
-              if bad is not None:
-                  raise SystemExit(f"APK zip corrupt: {bad}")
-              if any(a.startswith("x86") for a in abis):
-                  raise SystemExit(f"Unexpected emulator ABIs in {path}: {abis}")
-              if not need <= set(abis):
-                  raise SystemExit(f"Missing ABI {need} in {path}: {abis}")
-              if size > 70_000_000:
-                  print(f"::warning::{path} larger than 70MB")
+          path = "app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
+          size = os.path.getsize(path)
+          z = zipfile.ZipFile(path)
+          bad = z.testzip()
+          abis = sorted({n.split("/")[1] for n in z.namelist() if n.startswith("lib/") and n.count("/") >= 2})
+          print(f"APK size={size} ({size/1e6:.1f} MB) abis={abis} corrupt={bad}")
+          if bad is not None:
+              raise SystemExit(f"APK zip corrupt: {bad}")
+          if abis != ["arm64-v8a"]:
+              raise SystemExit(f"Expected only arm64-v8a, got {abis}")
+          if size > 70_000_000:
+              print("::warning::APK larger than 70MB")
           PY
 
-      - name: Package APK and source zip
+      - name: Package single APK
         run: |
           cp app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk FinUp.apk
-          cp app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk FinUp-arm32.apk
-          cd app
-          zip -r ../FinUp-source.zip . -x 'build/*' '.dart_tool/*' '.idea/*' '*.iml' 'android/.gradle/*' 'android/local.properties'
-          cd ..
+          ls -lh FinUp.apk
 
-      - name: Publish private release (APK + source)
+      - name: Publish release (APK only)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
@@ -205,13 +193,9 @@ jobs:
             ${{ inputs.notes }}
 
             ## Install
-            - **FinUp.apk** — for almost all phones (64-bit / arm64). Prefer this.
-            - **FinUp-arm32.apk** — only for older 32-bit phones.
-            - Wait until the download finishes completely before installing. A partial file shows “App not installed”.
-          files: |
-            FinUp.apk
-            FinUp-arm32.apk
-            FinUp-source.zip
+            Download **FinUp.apk**, wait until the full file finishes, then install.
+            A partial download shows “App not installed”.
+          files: FinUp.apk
 
       - name: Publish APK to public updates repo
         if: env.RELEASES_TOKEN != ''
@@ -222,6 +206,4 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: FinUp 2.1.${{ github.run_number }}
           body: ${{ inputs.notes }}
-          files: |
-            FinUp.apk
-            FinUp-arm32.apk
+          files: FinUp.apk
