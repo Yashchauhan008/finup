@@ -57,7 +57,7 @@ jobs:
       - name: Generate app source
         run: |
           bash finup.sh
-          for n in 2 3 4 5 6 7 8 9 10 11 12 13 14; do
+          for n in 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
             if [ -f "finup$n.sh" ]; then bash "finup$n.sh"; fi
           done
 
