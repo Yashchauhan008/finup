@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="add_expense" android:enabled="true" android:icon="@drawable/sc_add"
+        android:shortcutShortLabel="@string/sc_add_short" android:shortcutLongLabel="@string/sc_add_long">
+        <intent android:action="finup.add_expense" android:targetPackage="com.yash.finup"
+            android:targetClass="com.yash.finup.MainActivity">
+            <extra android:name="finup_action" android:value="add_expense"/>
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="voice" android:enabled="true" android:icon="@drawable/sc_voice"
+        android:shortcutShortLabel="@string/sc_voice_short" android:shortcutLongLabel="@string/sc_voice_long">
+        <intent android:action="finup.voice" android:targetPackage="com.yash.finup"
+            android:targetClass="com.yash.finup.MainActivity">
+            <extra android:name="finup_action" android:value="voice"/>
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="scan" android:enabled="true" android:icon="@drawable/sc_scan"
+        android:shortcutShortLabel="@string/sc_scan_short" android:shortcutLongLabel="@string/sc_scan_long">
+        <intent android:action="finup.scan" android:targetPackage="com.yash.finup"
+            android:targetClass="com.yash.finup.MainActivity">
+            <extra android:name="finup_action" android:value="scan"/>
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="invest" android:enabled="true" android:icon="@drawable/sc_add"
+        android:shortcutShortLabel="@string/sc_invest_short" android:shortcutLongLabel="@string/sc_invest_long">
+        <intent android:action="finup.invest" android:targetPackage="com.yash.finup"
+            android:targetClass="com.yash.finup.MainActivity">
+            <extra android:name="finup_action" android:value="invest"/>
+        </intent>
+    </shortcut>
+</shortcuts>

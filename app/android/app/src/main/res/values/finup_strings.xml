@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="finup_widget_desc">Today\'s spending, review count and quick add</string>
+    <string name="sc_add_short">Add expense</string>
+    <string name="sc_add_long">Add an expense</string>
+    <string name="sc_voice_short">Voice entry</string>
+    <string name="sc_voice_long">Add by voice</string>
+    <string name="sc_scan_short">Scan receipt</string>
+    <string name="sc_scan_long">Scan a receipt</string>
+    <string name="sc_invest_short">Invest</string>
+    <string name="sc_invest_long">Invest into a savings goal</string>
+    <string name="finup_w_budget_desc">Category budgets vs this month</string>
+    <string name="finup_w_accounts_desc">Balances for each account</string>
+    <string name="finup_w_people_desc">Who owes you and whom you owe</string>
+    <string name="finup_w_week_desc">This week vs last week spending</string>
+    <string name="finup_w_review_desc">Transactions waiting for review</string>
+</resources>

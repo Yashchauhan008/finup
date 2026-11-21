@@ -1,0 +1,27 @@
+#!/bin/bash
+# BSD/macOS shim for GNU-style sed -i used by finup*.sh (CI uses GNU sed).
+set -euo pipefail
+
+args=()
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == "-i" ]]; then
+    args+=("-i" "")
+    shift
+    continue
+  fi
+  args+=("$1")
+  shift
+done
+
+out=()
+for a in "${args[@]}"; do
+  if [[ "$a" =~ ^0,/(.+)/s//(.*)$ ]]; then
+    pat="${BASH_REMATCH[1]}"
+    repl="${BASH_REMATCH[2]}"
+    out+=("0,/${pat}/s/${pat}/${repl}/")
+  else
+    out+=("$a")
+  fi
+done
+
+exec /usr/bin/sed "${out[@]}"
