@@ -112,6 +112,19 @@ replace_once(
     already='rememberDeletedRef(t.ref)',
 )
 
+# Also clear People ledger rows when a txn is deleted from Activity/Home.
+replace_once(
+    'lib/data/repo.dart',
+    '''    await rememberDeletedRef(t.ref);
+    await db.delete('transactions', where: 'id = ?', whereArgs: [t.id]);
+  }''',
+    '''    await rememberDeletedRef(t.ref);
+    await db.delete('ledger', where: 'txn_id = ?', whereArgs: [t.id]);
+    await db.delete('transactions', where: 'id = ?', whereArgs: [t.id]);
+  }''',
+    already="delete('ledger', where: 'txn_id = ?",
+)
+
 # People: deleting a ledger entry must fully remove linked SMS txn (tombstone),
 # not send it back to review where autoLinkPeople resurrects it.
 replace_once(
@@ -566,6 +579,7 @@ replace_once(
 checks = [
     ('lib/data/repo.dart', 'deleted_refs', 'tombstone table'),
     ('lib/data/repo.dart', 'rememberDeletedRef(t.ref)', 'delete remembers ref'),
+    ('lib/data/repo.dart', "delete('ledger', where: 'txn_id = ?", 'delete clears ledger'),
     ('lib/data/people_repo.dart', 'Always delete the linked txn', 'people delete hard'),
     ('lib/sms/sync.dart', 'isDeletedRef(key)', 'sync skips deleted'),
     ('lib/sms/sync.dart', 'Prefer newest available-balance', 'balance refresh'),
