@@ -64,9 +64,7 @@ extension Backup on AppDatabase {
           });
           try {
             await txn.insert(t, map, conflictAlgorithm: ConflictAlgorithm.replace);
-          } catch (_) {
-            // Skip malformed / schema-mismatched rows rather than failing whole import.
-          }
+          } catch (_) {}
         }
       }
     });
