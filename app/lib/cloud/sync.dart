@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/backup.dart';
@@ -107,7 +108,7 @@ class CloudSync {
     await _saveSession(res.token, res.user);
     await _alignRevision(res.token);
     await markDirty();
-    return sync();
+    return sync(force: true);
   }
 
   Future<CloudSyncResult> login({
@@ -117,15 +118,18 @@ class CloudSync {
     final res = await api.login(email: email, password: password);
     await _saveSession(res.token, res.user);
     await _alignRevision(res.token);
-    // Prefer cloud if local has no transactions; otherwise push local.
-    final txns = await AppDatabase.instance.db.query('transactions', limit: 1);
-    if (txns.isEmpty) {
+    final localCount = Sqflite.firstIntValue(
+          await AppDatabase.instance.db.rawQuery('SELECT COUNT(*) FROM transactions'),
+        ) ??
+        0;
+    if (localCount == 0) {
       final p = await _prefs;
       await p.setBool(_kDirty, false);
       return sync();
     }
+    // Phone has data: force-push so an empty web signup cannot keep cloud empty.
     await markDirty();
-    return sync();
+    return sync(force: true);
   }
 
   Future<Map<String, dynamic>> _exportTables() async {
