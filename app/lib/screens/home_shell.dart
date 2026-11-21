@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../cloud/sync.dart';
 import '../data/db.dart';
 import '../state/app_state.dart';
 import '../state/txn_state.dart';
@@ -27,6 +28,7 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _tab = 0;
+  DateTime? _lastCloudSync;
 
   @override
   void initState() {
@@ -46,6 +48,24 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) _sync();
   }
 
+  bool get _cloudDue {
+    final last = _lastCloudSync;
+    if (last == null) return true;
+    return DateTime.now().difference(last) >= const Duration(hours: 1);
+  }
+
+  Future<void> _cloudSyncIfNeeded({bool force = false}) async {
+    if (!await CloudSync.instance.isSignedIn) return;
+    if (!force && !_cloudDue && !(await CloudSync.instance.isDirty)) return;
+    final res = await CloudSync.instance.sync();
+    _lastCloudSync = DateTime.now();
+    if (!mounted) return;
+    if (res.ok && (res.message.contains('Pulled') || res.message.contains('Synced'))) {
+      await context.read<AccountsState>().load();
+      await context.read<TxnState>().load();
+    }
+  }
+
   Future<void> _sync() async {
     if (!mounted) return;
     await handleLaunchAction(context);
@@ -57,6 +77,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       await Native.ensureSmsReceive();
       await txns.sync(accounts);
     }
+    await _cloudSyncIfNeeded(force: true);
     if (mounted) UpdateService.autoCheck(context);
   }
 

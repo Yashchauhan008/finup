@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../cloud/sync.dart';
 import '../data/db.dart';
 import '../data/people_repo.dart';
 import '../data/tags_repo.dart';
@@ -55,6 +56,7 @@ class TxnState extends ChangeNotifier {
       await AppDatabase.instance.autoLinkPeople();
       await applyPendingCategories();
       await AppDatabase.instance.autoTagTrips();
+      if (n > 0) await CloudSync.instance.markDirty();
     } catch (_) {}
     syncing = false;
     await accounts.load();
@@ -68,12 +70,14 @@ class TxnState extends ChangeNotifier {
     } else {
       await _db.editTxn(old, t);
     }
+    await CloudSync.instance.markDirty();
     await accounts.load();
     await load();
   }
 
   Future<void> delete(AccountsState accounts, Txn t) async {
     await _db.deleteTxn(t);
+    await CloudSync.instance.markDirty();
     await accounts.load();
     await load();
   }
@@ -85,17 +89,20 @@ class TxnState extends ChangeNotifier {
       await _db.addRule(key, categoryId);
       await _db.applyRuleToPending(key, categoryId);
     }
+    await CloudSync.instance.markDirty();
     await load();
   }
 
   Future<void> rememberRule(String payee, int categoryId) async {
     await _db.addRule(payee, categoryId);
     await _db.applyRuleToPending(payee, categoryId);
+    await CloudSync.instance.markDirty();
     await load();
   }
 
   Future<void> markAllReviewed() async {
     await _db.markAllReviewed();
+    await CloudSync.instance.markDirty();
     await load();
   }
 }

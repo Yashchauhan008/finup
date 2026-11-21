@@ -16,6 +16,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import 'about_screen.dart';
 import 'account_editor.dart';
+import 'cloud_account_screen.dart';
 import 'extra_settings.dart';
 import 'budgets_screen.dart';
 import 'categories_screen.dart';
@@ -23,6 +24,7 @@ import 'goals_screen.dart';
 import 'intro_screen.dart';
 import 'legal_screen.dart';
 import 'sms_setup_screen.dart';
+import '../cloud/sync.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -37,6 +39,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _bioOn = false;
   bool _canBio = false;
   bool _busy = false;
+  bool _cloudOn = false;
+  String? _cloudEmail;
 
   @override
   void initState() {
@@ -49,19 +53,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final lock = await LockPrefs.enabled();
     final bio = await LockPrefs.biometric();
     final can = await Native.canBiometric();
+    final cloudOn = await CloudSync.instance.isSignedIn;
+    final cloudEmail = await CloudSync.instance.email;
     if (!mounted) return;
     setState(() {
       _remOn = rem;
       _lockOn = lock;
       _bioOn = bio;
       _canBio = can;
+      _cloudOn = cloudOn;
+      _cloudEmail = cloudEmail;
     });
   }
 
   void _snack(String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
-  void _open(Widget page) => Navigator.of(context).push(fadeRoute(page));
+  Future<void> _open(Widget page) async {
+    await Navigator.of(context).push(fadeRoute(page));
+  }
 
   Future<void> _editName(SettingsState s) async {
     final c = TextEditingController(text: s.userName);
@@ -199,8 +209,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ok = false;
     }
     if (ok) {
+      await CloudSync.instance.markDirty();
       await accounts.load();
       await txns.load();
+      if (await CloudSync.instance.isSignedIn) {
+        await CloudSync.instance.sync();
+      }
     }
     if (mounted) _snack(ok ? 'Backup restored.' : 'That file is not a FinUp backup.');
   }
@@ -261,6 +275,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: Text(s.userName.isEmpty ? 'Not set' : s.userName),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => _editName(s),
+            ),
+            ListTile(
+              leading: Icon(Icons.cloud_sync_rounded,
+                  color: _cloudOn ? AppColors.income : null),
+              title: Text(_cloudOn ? 'Cloud sync on' : 'Cloud sync'),
+              subtitle: Text(_cloudOn
+                  ? (_cloudEmail ?? 'Signed in · 2-way with web')
+                  : 'Sign in to sync with FinUp web'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () async {
+                await _open(const CloudAccountScreen());
+                if (mounted) _init();
+              },
             ),
           ]),
           _Section(title: 'Appearance', children: [

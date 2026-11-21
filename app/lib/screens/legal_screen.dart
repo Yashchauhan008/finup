@@ -131,7 +131,7 @@ class AboutFinUpScreen extends StatelessWidget {
               const ListTile(
                 leading: Icon(Icons.code_rounded),
                 title: Text('Built with Flutter'),
-                subtitle: Text('No cloud, no tracking, no ads'),
+                subtitle: Text('Optional cloud sync · no ads'),
               ),
             ]),
           ),

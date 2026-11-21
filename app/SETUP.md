@@ -1,7 +1,9 @@
 # FinUp – Codebase & Build Setup
 
-FinUp is a private, offline expense manager built with Flutter (Android only).
-All data stays on the phone. There is no backend and no API.
+FinUp is a private, offline-first expense manager built with Flutter (Android).
+Data lives on the phone by default. Optional cloud sync uses
+`https://api.finup.yashchauhan.pro` so the same account works on FinUp web
+(`finup-frontend`) with 2-way revision-based sync.
 
 ## How the repository works
 

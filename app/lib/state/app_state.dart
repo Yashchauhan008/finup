@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../cloud/sync.dart';
 import '../data/db.dart';
 
 class SettingsState extends ChangeNotifier {
@@ -76,11 +77,13 @@ class AccountsState extends ChangeNotifier {
     } else {
       await _db.updateAccount(a);
     }
+    await CloudSync.instance.markDirty();
     await load();
   }
 
   Future<void> remove(int id) async {
     await _db.removeAccount(id);
+    await CloudSync.instance.markDirty();
     await load();
   }
 }

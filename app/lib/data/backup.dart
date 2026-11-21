@@ -1,16 +1,33 @@
 import 'dart:convert';
 
+import 'package:sqflite/sqflite.dart';
+
 import 'db.dart';
 
-const _tables = [
-  'accounts', 'categories', 'transactions', 'people', 'ledger', 'rules', 'budgets', 'goals', 'tags', 'txn_tags', 'receipts'
+const kFinupSyncTables = [
+  'accounts',
+  'categories',
+  'transactions',
+  'people',
+  'ledger',
+  'rules',
+  'budgets',
+  'goals',
+  'tags',
+  'txn_tags',
+  'receipts',
+  'deleted_refs',
 ];
 
 extension Backup on AppDatabase {
   Future<String> exportJson() async {
     final data = <String, Object?>{};
-    for (final t in _tables) {
-      data[t] = await db.query(t);
+    for (final t in kFinupSyncTables) {
+      try {
+        data[t] = await db.query(t);
+      } catch (_) {
+        data[t] = <Map<String, Object?>>[];
+      }
     }
     return jsonEncode({
       'app': 'FinUp',
@@ -27,14 +44,29 @@ extension Backup on AppDatabase {
     }
     final tables = root['tables'] as Map;
     await db.transaction((txn) async {
-      for (final t in _tables) {
-        await txn.delete(t);
+      for (final t in kFinupSyncTables) {
+        try {
+          await txn.delete(t);
+        } catch (_) {}
       }
-      for (final t in _tables) {
+      for (final t in kFinupSyncTables) {
         final rows = tables[t];
         if (rows is! List) continue;
         for (final r in rows) {
-          if (r is Map) await txn.insert(t, Map<String, Object?>.from(r));
+          if (r is! Map) continue;
+          final map = <String, Object?>{};
+          r.forEach((k, v) {
+            if (v == null || v is num || v is String || v is bool) {
+              map[k.toString()] = v;
+            } else {
+              map[k.toString()] = v.toString();
+            }
+          });
+          try {
+            await txn.insert(t, map, conflictAlgorithm: ConflictAlgorithm.replace);
+          } catch (_) {
+            // Skip malformed / schema-mismatched rows rather than failing whole import.
+          }
         }
       }
     });
@@ -68,8 +100,22 @@ extension Backup on AppDatabase {
   }
 
   Future<void> wipeAll() async {
-    for (final t in ['accounts', 'transactions', 'people', 'ledger', 'rules', 'budgets', 'goals', 'tags', 'txn_tags', 'receipts']) {
-      await db.delete(t);
+    for (final t in [
+      'accounts',
+      'transactions',
+      'people',
+      'ledger',
+      'rules',
+      'budgets',
+      'goals',
+      'tags',
+      'txn_tags',
+      'receipts',
+      'deleted_refs',
+    ]) {
+      try {
+        await db.delete(t);
+      } catch (_) {}
     }
   }
 }
