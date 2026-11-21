@@ -376,8 +376,13 @@ replace_once(
     already='_showTodaySpend(context)',
 )
 
-# Need AppText import? home already has theme. Need fadeRoute from common - has common.
-# SettingsState read - provider already used.
+# txns() lives on Repo extension — home must import repo.dart
+replace_once(
+    'lib/screens/home_screen.dart',
+    "import '../data/db.dart';\n",
+    "import '../data/db.dart';\nimport '../data/repo.dart';\n",
+    already="import '../data/repo.dart';",
+)
 
 # =============================================================================
 # 4) Budgets / Goals create feedback + safer parse
@@ -565,6 +570,7 @@ checks = [
     ('lib/sms/sync.dart', 'isDeletedRef(key)', 'sync skips deleted'),
     ('lib/sms/sync.dart', 'Prefer newest available-balance', 'balance refresh'),
     ('lib/screens/home_screen.dart', '_showTodaySpend', 'spent today sheet'),
+    ('lib/screens/home_screen.dart', "import '../data/repo.dart';", 'home repo import'),
     ('lib/screens/budgets_screen.dart', 'Budget saved', 'budget feedback'),
     ('lib/screens/goals_screen.dart', 'Goal created', 'goal feedback'),
 ]
